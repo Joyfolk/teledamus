@@ -8,32 +8,93 @@
 
 %% API
 -export([start_link/4]).
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/3, to_cache/4, query/5, prepare_query/4, batch_query/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
 
--record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy}).
+-record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy,
+                stms_cache :: dict()}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-options({connection, Pid}, Timeout) -> gen_server:call(Pid, options, Timeout).
+options({connection, Pid}, Timeout) ->
+  gen_server:call(Pid, options, Timeout).
 
-query({connection, Pid}, Query, Params, Timeout) -> gen_server:call(Pid, {query, Query, Params}, Timeout).
+query({connection, Pid}, Query, Params, Timeout) ->
+  gen_server:call(Pid, {query, Query, Params}, Timeout).
 
-prepare_query({connection, Pid}, Query, Timeout) -> gen_server:call(Pid, {prepare, Query}, Timeout).
+query(Con, Query, Params, Timeout, UseCache) ->
+  case UseCache of
+    true ->
+      case from_cache(Con, Query, Timeout) of
+        {ok, Id} ->
+          execute_query(Con, Id, Params, Timeout);
+        _ ->
+          case prepare_query(Con, Query, Timeout) of
+            {Id, _, _} ->
+              to_cache(Con, Query, Id, Timeout),
+              execute_query(Con, Id, Params, Timeout);
+            Err ->
+              Err
+          end
+      end;
 
-execute_query({connection, Pid}, ID, Params, Timeout) -> 	gen_server:call(Pid, {execute, ID, Params}, Timeout).
+    false ->
+      query(Con, Query, Params, Timeout)
+  end.
 
-batch_query({connection, Pid}, Batch, Timeout) -> gen_server:call(Pid, {batch, Batch}, Timeout).
 
-subscribe_events({connection, Pid}, EventTypes, Timeout) -> gen_server:call(Pid, {register, EventTypes}, Timeout).
+prepare_query(Con, Query, Timeout) ->
+  prepare_query(Con, Query, Timeout, false).
 
-get_socket({connection, Pid}) -> gen_server:call(Pid, get_socket).
+prepare_query(Con = {connection, Pid}, Query, Timeout, UseCache) ->
+  R = gen_server:call(Pid, {prepare, Query}, Timeout),
+  case {UseCache, R} of
+    {true, {Id, _, _}} ->
+      to_cache(Con, Query, Id, Timeout),
+      R;
+    {false, _} ->
+      R
+  end.
+
+execute_query({connection, Pid}, ID, Params, Timeout) ->
+  gen_server:call(Pid, {execute, ID, Params}, Timeout).
+
+batch_query({connection, Pid}, Batch, Timeout) ->
+  gen_server:call(Pid, {batch, Batch}, Timeout).
+
+batch_query(Con = {connection, Pid}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
+  case UseCache of
+    true ->
+      NBatch = Batch#batch_query{queries = lists:map(
+        fun({Id, Args}) when is_binary(Id) ->
+             {Id, Args};
+           ({Query, Args}) when is_list(Query) ->
+             {Id, _, _} = prepare_query(Con, Query, Timeout, true),
+             {Id, Args}
+        end, Queries)},
+      gen_server:call(Pid, {batch, NBatch}, Timeout);
+    false ->
+      gen_server:call(Pid, {batch, Batch}, Timeout)
+  end.
+
+subscribe_events({connection, Pid}, EventTypes, Timeout) ->
+  gen_server:call(Pid, {register, EventTypes}, Timeout).
+
+get_socket({connection, Pid}) ->
+  gen_server:call(Pid, get_socket).
+
+from_cache({connection, Pid}, Query, Timeout) ->
+  gen_server:call(Pid, {from_cache, Query}, Timeout).
+
+to_cache({connection, Pid}, Query, Id, Timeout) ->
+  gen_server:call(Pid, {to_cache, Query, Id}, Timeout).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -63,7 +124,7 @@ start_link(Socket, Credentials, Transport, Compression) ->
 init([Socket, Credentials, Transport, Compression]) ->
   case startup(Socket, Credentials, Transport, Compression) of
     ok ->
-      {ok, #state{socket = Socket, transport = Transport, compression = Compression}};
+      {ok, #state{socket = Socket, transport = Transport, compression = Compression, stms_cache = dict:new()}};
     {error, Reason} ->
       {stop, Reason};
     R ->
@@ -121,6 +182,12 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
 			send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER}, length = byte_size(Body), body = Body}),
 			set_active(Socket, Transport),
 			{noreply, State#state{caller = From}};
+
+    {from_cache, Query} ->
+      {reply, dict:find(Query, State#state.stms_cache), State};
+
+    {to_cache, Query, Id} ->
+      {reply, ok, State#state{stms_cache = dict:store(Query, Id, State#state.stms_cache)}};
 
 		get_socket ->
 			{reply, State#state.socket, Socket};
