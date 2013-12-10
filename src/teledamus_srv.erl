@@ -4,7 +4,7 @@
 
 -include_lib("rr.hrl").
 
--export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, release_connection/1]).
+-export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
 -define(SERVER, ?MODULE).
 
@@ -20,9 +20,15 @@
 get_connection() ->
 	gen_server:call(?SERVER, get_connection).
 
+get_connection(Timeout) ->
+  gen_server:call(?SERVER, get_connection, Timeout).
+
+
 release_connection(Connection) ->
 	gen_server:call(?SERVER, {release_connection, Connection}).
 
+release_connection(Connection, Timeout) ->
+  gen_server:call(?SERVER, {release_connection, Connection}, Timeout).
 
 %%--------------------------------------------------------------------
 %% @doc
