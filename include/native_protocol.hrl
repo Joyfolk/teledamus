@@ -104,7 +104,7 @@
 
 
 %% queries
--record(query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
+-record(query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = true:: boolean(), page_size :: integer(),
                        bind_values = []:: list(any()), paging_state :: binary(), serial_consistency = undefined :: consistency_level()}).
 
 -type query_params() :: #query_params{}.
@@ -131,4 +131,5 @@
 -type colspec() :: [{string(), string(), string(), atom()}].
 -type metadata() :: {colspec(), paging_state()}.
 -type rows() :: [list()].
--export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0]).
+-type result_rows() :: {metadata(), paging_state(), rows()}.
+-export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0]).

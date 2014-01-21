@@ -96,7 +96,7 @@ options(Connection, Timeout) ->
 %%% Query - string with CQL query
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection(), string()) -> timeout | ok | error() | rows() | schema_change().
+-spec query(connection(), string()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Connection, Query) ->
   connection:query(Connection, Query, #query_params{}, ?DEFAULT_TIMEOUT).
 
@@ -108,7 +108,7 @@ query(Connection, Query) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection(), string(), timeout()) -> timeout | ok | error() | rows() | schema_change().
+-spec query(connection(), string(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Connection, Query, Timeout) ->
   connection:query(Connection, Query, #query_params{}, Timeout).
 
@@ -122,7 +122,7 @@ query(Connection, Query, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection(), string(), query_params(), timeout()) -> timeout | ok | error() | rows() | schema_change().
+-spec query(connection(), string(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Connection, Query, Params, Timeout) ->
 	connection:query(Connection, Query, Params, Timeout).
 
@@ -136,7 +136,7 @@ query(Connection, Query, Params, Timeout) ->
 %%% UseCache - use cached preparestatements
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection(), string(), query_params(), timeout(), boolean()) -> timeout | ok | error() | rows() | schema_change().
+-spec query(connection(), string(), query_params(), timeout(), boolean()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Connection, Query, Params, Timeout, UseCache) ->
   connection:query(Connection, Query, Params, Timeout, UseCache).
 
@@ -187,7 +187,7 @@ prepare_query(Connection, Query, Timeout, UseCache) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection(), binary()) -> timeout | ok | error() | rows() | schema_change().
+-spec execute_query(connection(), binary()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Connection, ID) ->
   connection:execute_query(Connection, ID, #query_params{}, ?DEFAULT_TIMEOUT).
 
@@ -200,7 +200,7 @@ execute_query(Connection, ID) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection(), binary(), timeout()) -> timeout | ok | error() | rows() | schema_change().
+-spec execute_query(connection(), binary(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Connection, ID, Timeout) ->
   connection:execute_query(Connection, ID, #query_params{}, Timeout).
 
@@ -213,7 +213,7 @@ execute_query(Connection, ID, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection(), binary(), query_params(), timeout()) -> timeout | ok | error() | rows() | schema_change().
+-spec execute_query(connection(), binary(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Connection, ID, Params, Timeout) ->
 	connection:execute_query(Connection, ID, Params, Timeout).
 
