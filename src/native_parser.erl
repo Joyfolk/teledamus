@@ -455,7 +455,7 @@ parse_metadata(Data) ->
 											end,
 	if
 		NoMeta =:= 1 ->
-			{{[], PagingState}, X1};
+			{{[[] || _X <- lists:seq(1, ColumnCount)], PagingState}, X1};
 		true ->
 			{Keyspace, Table, X2} = if
 																GlobalTableSpec =:= 1 ->

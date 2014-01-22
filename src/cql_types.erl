@@ -36,49 +36,55 @@ get_length(Data, IntSize) ->
     short -> 16;
     int -> 32
   end,
-  <<Length:S, Rest/binary>> = Data,
+  <<Length:S/signed, Rest/binary>> = Data,
   {Length, Rest}.
 
 -spec decode(cql_value_type(), cql_data(), int | short) -> {cql_value(), cql_data()}.
 decode(Type, Value, IntSize) ->
 %%   decode_int
   {Length, Data} = get_length(Value, IntSize),
-  <<D:Length/binary, Rest/binary>> = Data,
-	V = case Type of
-		{custom, _Class} -> D;
-		ascii -> decode_string(D, ascii);
-		bigint -> decode_int(D);
-		blob -> D;
-		boolean -> decode_boolean(D);
-		counter -> decode_int(D);
-		decimal -> decode_decimal(D);
-		double -> decode_float(D);
-		float -> decode_float(D);
-		int -> decode_int(D);
-		text -> decode_string(D, unicode);
-		timestamp -> decode_int(D);
-		uuid -> D;      %% todo: make uuid generator & utils http://johannburkard.de/software/uuid/
-		varchar -> decode_string(D, unicode);
-		varint -> decode_int(D);
-		timeuuid -> D;  %% todo: make time uuid generator & utils  http://johannburkard.de/software/uuid/
-		inet -> decode_inet(D);
+  if
+    Length > 0 ->
+      <<D:Length/binary, Rest/binary>> = Data,
+      V = case Type of
+            {custom, _Class} -> D;
+            ascii -> decode_string(D, ascii);
+            bigint -> decode_int(D);
+            blob -> D;
+            boolean -> decode_boolean(D);
+            counter -> decode_int(D);
+            decimal -> decode_decimal(D);
+            double -> decode_float(D);
+            float -> decode_float(D);
+            int -> decode_int(D);
+            text -> decode_string(D, unicode);
+            timestamp -> decode_int(D);
+            uuid -> D;      %% todo: make uuid generator & utils http://johannburkard.de/software/uuid/
+            varchar -> decode_string(D, unicode);
+            varint -> decode_int(D);
+            timeuuid -> D;  %% todo: make time uuid generator & utils  http://johannburkard.de/software/uuid/
+            inet -> decode_inet(D);
 
-		{list, ValueType} ->
-      <<L:16/big-unsigned-integer, X0/binary>> = D,
-			decode_collection(X0, L, ValueType);
+            {list, ValueType} ->
+              <<L:16/big-unsigned-integer, X0/binary>> = D,
+              decode_collection(X0, L, ValueType);
 
-		{map, KeyType, ValueType} ->
-      <<L:16/big-unsigned-integer, X0/binary>> = D,
-			decode_map(X0, L, KeyType, ValueType);
+            {map, KeyType, ValueType} ->
+              <<L:16/big-unsigned-integer, X0/binary>> = D,
+              decode_map(X0, L, KeyType, ValueType);
 
-		{set, ValueType} ->
-      <<L:16/big-unsigned-integer, X0/binary>> = D,
-			decode_collection(X0, L, ValueType);
+            {set, ValueType} ->
+              <<L:16/big-unsigned-integer, X0/binary>> = D,
+              decode_collection(X0, L, ValueType);
 
-		_ ->
-			throw({unsupported_type, Type})
-	end,
-  {V, Rest}.
+            _ ->
+              throw({unsupported_type, Type})
+          end,
+      {V, Rest};
+    true ->
+      {undefined, Data}
+  end.
+
 
 
 -spec encode(cql_value_type(), cql_value()) -> cql_data().
