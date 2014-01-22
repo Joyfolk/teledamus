@@ -93,45 +93,51 @@ encode(Type, Value) ->
 
 -spec encode(cql_value_type(), cql_value(), int | short) -> cql_data().
 encode(Type, Value, IntSize) ->
-  D = case Type of
-        {custom, _Class} -> Value;
-        ascii -> encode_string(Value, ascii);
-        bigint -> encode_int(Value, long);
-        blob -> Value;
-        boolean -> encode_boolean(Value);
-        counter -> encode_int(Value, long);
-        decimal -> encode_decimal(Value);
-        double -> encode_float(Value, double);
-        float -> encode_float(Value, float);
-        int -> encode_uint(Value, int);
-        text -> encode_string(Value, unicode);
-        timestamp -> encode_int(Value, long);
-        uuid -> Value;
-        varchar -> encode_string(Value, unicode);
-        varint -> encode_int(Value, bigint);
-        timeuuid -> Value;
-        inet -> encode_inet(Value);
+  if
+    Value =/= undefined ->
+      D = case Type of
+            {custom, _Class} -> Value;
+            ascii -> encode_string(Value, ascii);
+            bigint -> encode_int(Value, long);
+            blob -> Value;
+            boolean -> encode_boolean(Value);
+            counter -> encode_int(Value, long);
+            decimal -> encode_decimal(Value);
+            double -> encode_float(Value, double);
+            float -> encode_float(Value, float);
+            int -> encode_uint(Value, int);
+            text -> encode_string(Value, unicode);
+            timestamp -> encode_int(Value, long);
+            uuid -> Value;
+            varchar -> encode_string(Value, unicode);
+            varint -> encode_int(Value, bigint);
+            timeuuid -> Value;
+            inet -> encode_inet(Value);
 
-        {list, ValueType} ->
-          L = encode_uint(length(Value), short),
-          C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
-          list_to_binary([L| C]);
+            {list, ValueType} ->
+              L = encode_uint(length(Value), short),
+              C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
+              list_to_binary([L| C]);
 
-        {map, KeyType, ValueType} ->
-          L = encode_uint(length(Value), short),
-          C = lists:map(fun({K, V}) -> [encode(KeyType, K, short), encode(ValueType, V, short)] end, Value),
-          list_to_binary([L| C]);
+            {map, KeyType, ValueType} ->
+              L = encode_uint(length(Value), short),
+              C = lists:map(fun({K, V}) -> [encode(KeyType, K, short), encode(ValueType, V, short)] end, Value),
+              list_to_binary([L| C]);
 
-        {set, ValueType} ->
-          L = encode_uint(length(Value), short),
-          C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
-          list_to_binary([L| C]);
+            {set, ValueType} ->
+              L = encode_uint(length(Value), short),
+              C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
+              list_to_binary([L| C]);
 
-        _ ->
-          throw({unsupported_type, Type})
-      end,
-  Length = encode_int(byte_size(D), IntSize),
-  <<Length/binary,D/binary>>.
+            _ ->
+              throw({unsupported_type, Type})
+          end,
+      Length = encode_int(byte_size(D), IntSize),
+      <<Length/binary,D/binary>>;
+
+    true ->
+      encode_int(-1, IntSize)
+  end.
 
 -spec decode_collection(binary(), non_neg_integer(), cql_value_type()) -> list(cql_value()).
 decode_collection(X, N, T)  ->
