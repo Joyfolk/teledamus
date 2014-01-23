@@ -489,9 +489,14 @@ parse_row(Data, Acc, ColSpecs) ->
 		[] ->
 			{Acc, Data};
 		[H | T] ->
-			{_K, _T, _N, Type} = H,
-%% 			{BV, X0} = parse_bytes(Data),
-			{V, X0} = cql_types:decode(Type, Data),
+      {V, X0} = case H of
+        [] -> %% no metadata, use blob
+          cql_types:decode(blob, Data);
+        {_K, _T, _N, Type} ->
+          cql_types:decode(Type, Data);
+        U ->
+          error_logger:error_msg("Uparseable colspec ~p~n", [U])
+      end,
 			parse_row(X0, [V | Acc], T)
 	end.
 

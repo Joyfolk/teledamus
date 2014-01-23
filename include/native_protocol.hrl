@@ -104,7 +104,7 @@
 
 
 %% queries
--record(query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = true:: boolean(), page_size :: integer(),
+-record(query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
                        bind_values = []:: list(any()), paging_state :: binary(), serial_consistency = undefined :: consistency_level()}).
 
 -type query_params() :: #query_params{}.
