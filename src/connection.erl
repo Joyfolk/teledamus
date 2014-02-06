@@ -229,9 +229,10 @@ handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = Transport, 
       handle_frame(Frame, State#state{buffer = NewBuffer})
   end;
 
-handle_info({ssl, Socket, Data}, #state{socket = Socket, buffer = Buffer, compression = Compression} = State) ->
+handle_info({ssl, Socket, Data}, #state{socket = Socket, transport = Transport, buffer = Buffer, compression = Compression} = State) ->
 	case native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
 		{undefined, NewBuffer} ->
+      set_active(Socket, Transport),
 			{noreply, State#state{buffer = NewBuffer}};
 		{Frame, NewBuffer} ->
 			handle_frame(Frame, State#state{buffer = NewBuffer})
