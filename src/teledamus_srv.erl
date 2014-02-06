@@ -96,7 +96,7 @@ init([RR, Opts, Credentials, Transport, Compression]) ->
 									 {noreply, NewState :: #state{}, timeout() | hibernate} |
 									 {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
 									 {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, State) ->
+handle_call(Request, From, State) ->
 	#state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression} = State,
 	case Request of
 		get_connection -> % todo: connection pooling
@@ -104,14 +104,22 @@ handle_call(Request, _From, State) ->
 				{error_no_resources, _S} ->
 					throw(error_no_resources);
 				{{Host, Port}, NS} ->
-					case Transport:connect(Host, Port, Opts) of
-						{ok, Socket} ->
-							{ok, Connection} = connection:start_link(Socket, Credentials, Transport, Compression),
-							ok = Transport:controlling_process(Socket, Connection),
-							{reply, {connection, Connection}, State#state{nodes = NS}};
-						{error, Reason} ->
-							{reply, {error, Reason}, State#state{nodes = NS}}
-					end
+          spawn(fun() ->
+            try
+              case Transport:connect(Host, Port, Opts) of
+                {ok, Socket} ->
+                  {ok, Connection} = connection:start_link(Socket, Credentials, Transport, Compression),
+                  ok = Transport:controlling_process(Socket, Connection),
+                  gen_server:reply(From, {connection, Connection});
+                {error, Reason} ->
+                  gen_server:reply(From, {error, Reason})
+              end
+            catch
+              E:EE ->
+                gen_server:reply(From, {error, {E, EE}})
+            end
+          end),
+          {noreply, State#state{nodes = NS}}
 			end;
 	  {release_connection, Connection} ->
 			 Socket = connection:get_socket(Connection),
