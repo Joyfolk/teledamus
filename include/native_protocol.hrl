@@ -122,7 +122,11 @@
 -record(batch_query, {batch_type = logged :: batch_type(), queries :: list(single_batch_query()), consistency_level = quorum:: consistency_level()}).
 -type batch_query() :: #batch_query{}.
 
+
+-record(stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
+
 -type error() :: #error{}.
+-type stream() :: #stream{}.
 -type connection() :: {connection, pid()}.
 -type options() :: [{string(), string()}].
 -type keyspace() :: {keyspace, string()}.
@@ -132,4 +136,4 @@
 -type metadata() :: {colspec(), paging_state()}.
 -type rows() :: [list()].
 -type result_rows() :: {metadata(), paging_state(), rows()}.
--export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0]).
+-export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0, stream/0]).
