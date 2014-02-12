@@ -167,7 +167,7 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
           case stream:start_link({connection, self()}, StreamId) of
             {ok, StreamPid} ->
               Stream = #stream{connection = {connection, self()}, stream_pid = StreamPid, stream_id = StreamId},
-              {reply, Stream, State#state{streams = dict:append(StreamId, StreamPid, Streams)}};
+              {reply, Stream, State#state{streams = dict:append(StreamId, Stream, Streams)}};
             {error, X} ->
               {reply, {error, X}, State}
           end
