@@ -8,7 +8,8 @@
 
 -include_lib("native_protocol.hrl").
 
--export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
+-export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, new_stream/2, new_stream/1, release_stream/2, release_stream/1,
+         options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
          execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0]).
 
 -define(DEFAULT_TIMEOUT, 5000).
@@ -67,6 +68,51 @@ release_connection(Connection) ->
 -spec release_connection(connection(), timeout()) -> 'ok'.
 release_connection(Connection, Timeout) ->
   teledamus_srv:release_connection(Connection, Timeout).
+
+
+%%% @doc
+%%% Create new stream for given connection
+%%%
+%%% Connection - connection to cassandra
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec new_stream(connection()) -> stream() | {error, any()}.
+new_stream(Connection) ->
+  connection:new_stream(Connection, ?DEFAULT_TIMEOUT).
+
+%%% @doc
+%%% Create new stream for given connection
+%%%
+%%% Connection - connection to cassandra
+%%% Timeout - operation timeout
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec new_stream(connection(), timeout()) -> stream() | {error, any()}.
+new_stream(Connection, Timeout) ->
+  connection:new_stream(Connection, Timeout).
+
+
+%%% @doc
+%%% Release stream
+%%%
+%%% Stream - ...
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec release_stream(stream()) -> ok | {error, any()}.
+release_stream(Stream) ->
+  connection:release_stream(Stream, ?DEFAULT_TIMEOUT).
+
+
+%%% @doc
+%%% Release stream
+%%%
+%%% Stream - ...
+%%% Timeout - operation timeout
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec release_stream(stream(), timeout()) -> ok | {error, any()}.
+release_stream(Stream, Timeout) ->
+  connection:release_stream(Stream, Timeout).
 
 %%% @doc
 %%% Request DB for options
