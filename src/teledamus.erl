@@ -9,7 +9,8 @@
 -include_lib("native_protocol.hrl").
 
 -export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
-         execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0]).
+         execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0,
+         new_stream/1, new_stream/2, release_stream/1, release_stream/2]).
 
 -define(DEFAULT_TIMEOUT, 5000).
 
