@@ -68,6 +68,51 @@ release_connection(Connection) ->
 release_connection(Connection, Timeout) ->
   teledamus_srv:release_connection(Connection, Timeout).
 
+
+%%% @doc
+%%% Create new stream for given connection
+%%%
+%%% Connection - connection to cassandra
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec new_stream(connection()) -> stream() | {error, any()}.
+new_stream(Connection) ->
+  connection:new_stream(Connection, ?DEFAULT_TIMEOUT).
+
+%%% @doc
+%%% Create new stream for given connection
+%%%
+%%% Connection - connection to cassandra
+%%% Timeout - operation timeout
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec new_stream(connection(), timeout()) -> stream() | {error, any()}.
+new_stream(Connection, Timeout) ->
+  connection:new_stream(Connection, Timeout).
+
+
+%%% @doc
+%%% Release stream
+%%%
+%%% Stream - ...
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec release_stream(stream()) -> ok | {error, any()}.
+release_stream(Stream) ->
+  connection:release_stream(Stream, ?DEFAULT_TIMEOUT).
+
+
+%%% @doc
+%%% Release stream
+%%%
+%%% Stream - ...
+%%% Timeout - operation timeout
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec release_stream(stream(), timeout()) -> ok | {error, any()}.
+release_stream(Stream, Timeout) ->
+  connection:release_stream(Stream, Timeout).
+
 %%% @doc
 %%% Request DB for options
 %%%
