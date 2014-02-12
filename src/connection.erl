@@ -15,9 +15,11 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(DEFAULT_STREAM_ID, 0).
 
 -record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy,
-  stms_cache :: dict(), streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
+                stms_cache :: dict(), streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
+
 
 %%%===================================================================
 %%% API
@@ -30,10 +32,10 @@ release_stream(S = #stream{connection = {connection, Pid}}, Timeout) ->
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
 options({connection, Pid}, Timeout) ->
-  gen_server:call(Pid, options, Timeout).
+  gen_server:call(Pid, {options, ?DEFAULT_STREAM_ID}, Timeout).
 
 query({connection, Pid}, Query, Params, Timeout) ->
-  gen_server:call(Pid, {query, Query, Params}, Timeout).
+  gen_server:call(Pid, {query, Query, Params, ?DEFAULT_STREAM_ID}, Timeout).
 
 query(Con, Query, Params, Timeout, UseCache) ->
   case UseCache of
@@ -60,7 +62,7 @@ prepare_query(Con, Query, Timeout) ->
   prepare_query(Con, Query, Timeout, false).
 
 prepare_query(Con = {connection, Pid}, Query, Timeout, UseCache) ->
-  R = gen_server:call(Pid, {prepare, Query}, Timeout),
+  R = gen_server:call(Pid, {prepare, Query, ?DEFAULT_STREAM_ID}, Timeout),
   case {UseCache, R} of
     {true, {Id, _, _}} ->
       to_cache(Con, Query, Id, Timeout),
@@ -70,10 +72,10 @@ prepare_query(Con = {connection, Pid}, Query, Timeout, UseCache) ->
   end.
 
 execute_query({connection, Pid}, ID, Params, Timeout) ->
-  gen_server:call(Pid, {execute, ID, Params}, Timeout).
+  gen_server:call(Pid, {execute, ID, Params, ?DEFAULT_STREAM_ID}, Timeout).
 
 batch_query({connection, Pid}, Batch, Timeout) ->
-  gen_server:call(Pid, {batch, Batch}, Timeout).
+  gen_server:call(Pid, {batch, Batch, ?DEFAULT_STREAM_ID}, Timeout).
 
 batch_query(Con = {connection, Pid}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
   case UseCache of
@@ -85,13 +87,13 @@ batch_query(Con = {connection, Pid}, Batch = #batch_query{queries = Queries}, Ti
             {Id, _, _} = prepare_query(Con, Query, Timeout, true),
             {Id, Args}
         end, Queries)},
-      gen_server:call(Pid, {batch, NBatch}, Timeout);
+      gen_server:call(Pid, {batch, NBatch, ?DEFAULT_STREAM_ID}, Timeout);
     false ->
-      gen_server:call(Pid, {batch, Batch}, Timeout)
+      gen_server:call(Pid, {batch, Batch, ?DEFAULT_STREAM_ID}, Timeout)
   end.
 
 subscribe_events({connection, Pid}, EventTypes, Timeout) ->
-  gen_server:call(Pid, {register, EventTypes}, Timeout).
+  gen_server:call(Pid, {register, EventTypes, ?DEFAULT_STREAM_ID}, Timeout).
 
 get_socket({connection, Pid}) ->
   gen_server:call(Pid, get_socket).
@@ -138,7 +140,7 @@ init([Socket, Credentials, Transport, Compression]) ->
       {stop, {unknown_error, R}}
   end.
 
-update_state(From, StreamId, State) ->
+update_state(StreamId, From, State) ->
   if
     is_integer(StreamId) andalso StreamId > 0 ->
       {noreply, State};
@@ -334,7 +336,7 @@ set_active(Socket, Transport) ->
 
 handle_frame(Frame = #frame{header = #header{opcode = OpCode}}, State = #state{caller = Caller, transport = Transport, streams = Streams}) ->
   set_active(State#state.socket, Transport),
-  StreamId = Frame#header.stream,
+  StreamId = (Frame#frame.header)#header.stream,
   UseStream = if StreamId > 0 andalso StreamId < 128 -> dict:is_key(StreamId, Streams); true -> false end,
   if
     UseStream ->

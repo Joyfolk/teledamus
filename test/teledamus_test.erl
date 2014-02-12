@@ -5,8 +5,8 @@
 -include_lib("cql_types.hrl").
 
 is_registered(_) ->
-	?_assertNot(undefined == whereis(teledamus_sup)),
-	?_assertNot(undefined == whereis(teledamus_srv)).
+	?_assertNot(undefined =:= whereis(teledamus_sup)),
+	?_assertNot(undefined =:= whereis(teledamus_srv)).
 
 
 start() ->
