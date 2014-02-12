@@ -177,42 +177,6 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
       %% todo: close something?
       {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
 
-    {options, StreamId} ->
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_OPTIONS}, length = 0, body = <<>>}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
-    {query, Query, Params, StreamId} ->
-      Body = native_parser:encode_query(Query, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_QUERY}, length = byte_size(Body), body = Body}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
-    {prepare, Query, StreamId} ->
-      Body = native_parser:encode_long_string(Query),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_PREPARE}, length = byte_size(Body), body = Body}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
-    {execute, ID, Params, StreamId} ->
-      Body = native_parser:encode_query(ID, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_EXECUTE}, length = byte_size(Body), body = Body}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
-    {batch, BatchQuery, StreamId} ->
-      Body = native_parser:encode_batch_query(BatchQuery),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_BATCH}, length = byte_size(Body), body = Body}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
-    {register, EventTypes, StreamId} ->
-      start_gen_event_if_required(),
-      Body = native_parser:encode_event_types(EventTypes),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER}, length = byte_size(Body), body = Body}),
-      set_active(Socket, Transport),
-      update_state(StreamId, From, State);
-
     {from_cache, Query} ->
       {reply, dict:find(Query, State#state.stms_cache), State};
 
@@ -223,8 +187,7 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
       {reply, State#state.socket, Socket};
 
     _ ->
-      error_logger:error_msg("Unknown request ~p~n", [Request]),
-      {reply, unknown_request, State#state{caller = undefined}}
+      handle_request(Request, From, State)
   end.
 
 %%--------------------------------------------------------------------
@@ -237,8 +200,8 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(_Request, _State) ->
-  ok.
+handle_cast(Request, State) ->
+  handle_request(Request, undefined, State).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -340,8 +303,8 @@ handle_frame(Frame = #frame{header = #header{opcode = OpCode}}, State = #state{c
   UseStream = if StreamId > 0 andalso StreamId < 128 -> dict:is_key(StreamId, Streams); true -> false end,
   if
     UseStream ->
-      #stream{stream_pid = Pid} = dict:fetch(StreamId, Streams),
-      stream:handle_frame(Pid, Frame),
+      [Stream] = dict:fetch(StreamId, Streams),
+      stream:handle_frame(Stream#stream.stream_pid, Frame),
       {noreply, State};
 
     true ->
@@ -485,3 +448,47 @@ find_next_stream_id(Id, Streams) ->
     true ->
       find_next_stream_id(Id + 1, Streams)
   end.
+
+
+handle_request(Request, From, State = #state{socket = Socket, transport = Transport, compression = Compression}) ->
+  case Request of
+    {options, StreamId} ->
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_OPTIONS}, length = 0, body = <<>>}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+    {query, Query, Params, StreamId} ->
+      Body = native_parser:encode_query(Query, Params),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_QUERY}, length = byte_size(Body), body = Body}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+    {prepare, Query, StreamId} ->
+      Body = native_parser:encode_long_string(Query),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_PREPARE}, length = byte_size(Body), body = Body}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+    {execute, ID, Params, StreamId} ->
+      Body = native_parser:encode_query(ID, Params),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_EXECUTE}, length = byte_size(Body), body = Body}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+    {batch, BatchQuery, StreamId} ->
+      Body = native_parser:encode_batch_query(BatchQuery),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_BATCH}, length = byte_size(Body), body = Body}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+    {register, EventTypes, StreamId} ->
+      start_gen_event_if_required(),
+      Body = native_parser:encode_event_types(EventTypes),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER}, length = byte_size(Body), body = Body}),
+      set_active(Socket, Transport),
+      update_state(StreamId, From, State);
+
+      _ ->
+       error_logger:error_msg("Unknown request ~p~n", [Request]),
+       {noereply, State#state{caller = undefined}}
+end.

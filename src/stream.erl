@@ -105,32 +105,32 @@ init([Connection, StreamId]) ->
 
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) -> {reply, Reply :: term(), NewState :: #state{}} | {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-{noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
+            {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State = #state{id = StreamId, connection = {connection, Connection}}) ->
   case Request of
-    {options, Timeout} ->
-      R = gen_server:call(Connection, {options, StreamId}, Timeout),
-      {reply, R, State#state{caller = From}};
+    {options, _Timeout} ->
+      gen_server:cast(Connection, {options, StreamId}),
+      {noreply, State#state{caller = From}};
 
-    {query, Query, Params, Timeout} ->
-      R = gen_server:call(Connection, {query, Query, Params, StreamId}, Timeout),
-      {noreply, R, State#state{caller = From}};
+    {query, Query, Params, _Timeout} ->
+      gen_server:cast(Connection, {query, Query, Params, StreamId}),
+      {noreply, State#state{caller = From}};
 
-    {prepare, Query, Timeout} ->
-      R = gen_server:call(Connection, {prepare, Query, StreamId}, Timeout),
-      {reply, R, State#state{caller = From}};
+    {prepare, Query, _Timeout} ->
+      gen_server:cast(Connection, {prepare, Query, StreamId}),
+      {noreply, State#state{caller = From}};
 
-    {execute, ID, Params, Timeout} ->
-      R = gen_server:call(Connection, {execute, ID, Params, StreamId}, Timeout),
-      {reply, R, State#state{caller = From}};
+    {execute, ID, Params, _Timeout} ->
+      gen_server:cast(Connection, {execute, ID, Params, StreamId}),
+      {noreply, State#state{caller = From}};
 
-    {batch, BatchQuery, Timeout} ->
-      R = gen_server:call(Connection, {batch,  BatchQuery, StreamId}, Timeout),
-      {reply, R, State#state{caller = From}};
+    {batch, BatchQuery, _Timeout} ->
+      gen_server:cast(Connection, {batch,  BatchQuery, StreamId}),
+      {noreply, State#state{caller = From}};
 
-    {register, EventTypes, Timeout} ->
-      R = gen_server:call(Connection, {register, EventTypes, StreamId}, Timeout),
-      {reply, R, State#state{caller = From}};
+    {register, EventTypes, _Timeout} ->
+      gen_server:cast(Connection, {register, EventTypes, StreamId}),
+      {noreply, State#state{caller = From}};
 
     {from_cache, Query, Timeout} ->
       R = gen_server:call(Connection, {from_cache, Query, StreamId}, Timeout),
@@ -146,7 +146,7 @@ handle_call(Request, From, State = #state{id = StreamId, connection = {connectio
   end.
 
 handle_frame(Pid, Frame) ->
-  gen_server:cast(Pid, {handle_frame, Frame}).
+  Pid ! {handle_frame, Frame}.
 
 reply_if_needed(Caller, Reply) ->
   case Caller of
@@ -193,12 +193,43 @@ handle_cast(Request, State = #state{caller = Caller}) ->
   end.
 
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) -> {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(_Info, State) ->
-  {noreply, State}.
+handle_info(Request, State = #state{caller = Caller}) ->
+  case Request of
+    {handle_frame, Frame} ->
+      OpCode = (Frame#frame.header)#header.opcode,
+      case OpCode of
+        ?OPC_ERROR ->
+          Error = native_parser:parse_error(Frame),
+          error_logger:error_msg("CQL error ~p~n", [Error]),
+          reply_if_needed(Caller, Error),
+          {noreply, State#state{caller = undefined}};
+        ?OPC_READY ->
+          reply_if_needed(Caller, ok),
+          {noreply, State#state{caller = undefined}};
+        ?OPC_AUTHENTICATE ->
+          throw({not_supported_option, authentificate}),
+          {noreply, State};
+        ?OPC_SUPPORTED ->
+          {Options, _} = native_parser:parse_string_multimap(Frame#frame.body),
+          reply_if_needed(Caller, Options),
+          {noreply, State#state{caller = undefined}};
+        ?OPC_RESULT ->
+          Result = native_parser:parse_result(Frame),
+          reply_if_needed(Caller, Result),
+          {noreply, State#state{caller = undefined}};
+        ?OPC_EVENT ->
+          Result = native_parser:parse_event(Frame),
+          gen_event:notify(cassandra_events, Result),
+          {noreply, State};
+        _ ->
+          error_logger:warning_msg("Unsupported OpCode: ~p~n", [OpCode]),
+          {noreply, State#state{caller = undefined}}
+      end
+  end.
 
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
 terminate(Reason, #state{caller = Id, connection = Pid}) ->
-  error_logger:error_msg("Stopping stream %p because of ~p~n", [Id, Reason]),
+  error_logger:error_msg("Stopping stream ~p because of ~p~n", [Id, Reason]),
   connection:release_stream(#stream{connection = Pid, stream_id = Id, stream_pid = self()}, 1000),
   ok.
 
