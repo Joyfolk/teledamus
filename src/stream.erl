@@ -8,7 +8,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/3, to_cache/4, query/5, prepare_query/4, batch_query/4, handle_frame/2]).
 
--define(SERVER, ?MODULE).
 
 -include_lib("native_protocol.hrl").
 
@@ -20,7 +19,7 @@
 
 -spec(start_link(connection(), pos_integer()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link(Connection, StreamId) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Connection, StreamId], []).
+  gen_server:start_link(?MODULE, [Connection, StreamId], []).
 
 options(#stream{stream_pid = Pid}, Timeout) ->
   gen_server:call(Pid, {options, Timeout}, Timeout).

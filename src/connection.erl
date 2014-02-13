@@ -453,38 +453,38 @@ find_next_stream_id(Id, Streams) ->
 handle_request(Request, From, State = #state{socket = Socket, transport = Transport, compression = Compression}) ->
   case Request of
     {options, StreamId} ->
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_OPTIONS}, length = 0, body = <<>>}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 
     {query, Query, Params, StreamId} ->
       Body = native_parser:encode_query(Query, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_QUERY}, length = byte_size(Body), body = Body}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 
     {prepare, Query, StreamId} ->
       Body = native_parser:encode_long_string(Query),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_PREPARE}, length = byte_size(Body), body = Body}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 
     {execute, ID, Params, StreamId} ->
       Body = native_parser:encode_query(ID, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_EXECUTE}, length = byte_size(Body), body = Body}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 
     {batch, BatchQuery, StreamId} ->
       Body = native_parser:encode_batch_query(BatchQuery),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_BATCH}, length = byte_size(Body), body = Body}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 
     {register, EventTypes, StreamId} ->
       start_gen_event_if_required(),
       Body = native_parser:encode_event_types(EventTypes),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER}, length = byte_size(Body), body = Body}),
+      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body}),
       set_active(Socket, Transport),
       update_state(StreamId, From, State);
 

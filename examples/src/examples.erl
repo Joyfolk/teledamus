@@ -68,7 +68,7 @@ load_test_stream(Count) ->
 
 load_test_stream(Id, Count, Con) ->
   Stream = teledamus:new_stream(Con),
-  teledamus:query(Stream, "USE examples"),
+  {keyspace, "examples"} = teledamus:query(Stream, "USE examples"),
   T0 = millis(),
   {PrepStmt, _, _} = teledamus:prepare_query(Stream, "INSERT INTO profiles(s_id, c_id, v_id, o_id) VALUES(?, ?, ?, ?)"),
   try
@@ -78,13 +78,13 @@ load_test_stream(Id, Count, Con) ->
       error_logger:error_msg("~p -> ~p:~p, stack=~p~n", [Id, E, EE, erlang:get_stacktrace()])
   end,
   T1 = millis(),
-  Cnt = case teledamus:query(Stream, "SELECT count(*) FROM profiles", #query_params{consistency_level = one}, infinity) of
-          {_, _, XX} -> XX;
-          Err -> Err
-        end,
-  T2 = millis(),
+%%   Cnt = case teledamus:query(Stream, "SELECT count(*) FROM profiles", #query_params{consistency_level = one}, infinity) of
+%%           {_, _, XX} -> XX;
+%%           Err -> Err
+%%         end,
+%%   T2 = millis(),
   teledamus:release_stream(Stream),
-  {load_test, [{load_time, T1 - T0}, {count_time, T2 - T1}, {count, Cnt}]}.
+  {load_test, [{load_time, T1 - T0}]}.
 
 
 load_test_multi_stream(N, Count) ->
@@ -154,7 +154,12 @@ p(Str, Id, Count) -> {varchar, Str ++ integer_to_list(Id) ++ "_" ++ integer_to_l
 
 load_test_int(_Con, _PrepStmt, _Id, 0) -> ok;
 load_test_int(Con, PrepStmt, Id, Count) ->
-  teledamus:execute_query(Con, PrepStmt, #query_params{consistency_level = one, bind_values = [p("s_id_", Id, Count), p("c_id_", Id, Count), p("v_id_", Id, Count), p("o_id_", Id, Count)]}, 5000),
+  try
+    teledamus:execute_query(Con, PrepStmt, #query_params{consistency_level = one, bind_values = [p("s_id_", Id, Count), p("c_id_", Id, Count), p("v_id_", Id, Count), p("o_id_", Id, Count)]}, 5000)
+  catch
+    E:EE ->
+      error_logger:error_msg("~p: Exception ~p:~p, stack=~p", [self(), E, EE, erlang:get_stacktrace()])
+  end,
   load_test_int(Con, PrepStmt, Id, Count - 1).
 
 millis() ->
