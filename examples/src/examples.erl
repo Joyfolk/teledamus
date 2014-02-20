@@ -1,7 +1,8 @@
 -module(examples).
 -author("Mikhail.Turnovskiy").
 
--export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1, load_test_multi/2, load_test_stream/1, load_test_multi_stream/2, load_test_multi_stream/1, prepare_data/2]).
+-export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2,
+         load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, prepare_data/2, load_test_multi_stream_multi/3]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
 
@@ -26,9 +27,12 @@ drop_schema() ->
   ok.
 
 load_test(Count) ->
-  load_test(0, Count).
+  load_test(Count, undefined).
 
-load_test(Id, Count) ->
+load_test(X, BatchSize) ->
+  load_test(0, X, BatchSize).
+
+load_test(Id, X, BatchSize)  ->
   Con = case teledamus:get_connection() of
     {error, X} ->
       error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
@@ -36,61 +40,81 @@ load_test(Id, Count) ->
     C -> C
   end,
   teledamus:query(Con, "USE examples"),
-	Data = prepare_data(Count, 1),
+	Data = case is_integer(X) of
+    true -> prepare_data(X, 1);
+    _ -> [X]
+  end,
   T0 = millis(),
   {PrepStmt, _, _} = teledamus:prepare_query(Con, "INSERT INTO profiles(s_id, c_id, v_id, o_id) VALUES(?, ?, ?, ?)"),
-  try
-    load_test_int(Con, PrepStmt, Data)
+  R = try
+    load_test_int(Con, PrepStmt, hd(Data), BatchSize)
   catch
     E:EE ->
       error_logger:error_msg("~p -> ~p:~p, stack=~p~n", [Id, E, EE, erlang:get_stacktrace()])
   end,
   T1 = millis(),
-  Cnt = case teledamus:query(Con, "SELECT count(*) FROM profiles", #query_params{consistency_level = one}, infinity) of
-    {_, _, XX} -> XX;
-    Err -> Err
-  end,
-  T2 = millis(),
   teledamus:release_connection(Con),
-  {load_test, [{load_time, T1 - T0}, {count_time, T2 - T1}, {count, Cnt}]}.
-
+  {{tm, T1 - T0}, R}.
 
 
 load_test_stream(Count) ->
+  load_test_stream(Count, undefined).
+
+load_test_stream(Count, BatchSize) ->
   Con = case teledamus:get_connection() of
           {error, X} ->
             error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
             throw(connection_error);
           C -> C
         end,
-	Data = prepare_data(Count, 1),
-  R = load_test_stream(Data, Con),
+	Data = prepare_data(Count, undefined),
+  R = load_test_stream(Data, Con, BatchSize),
   teledamus:release_connection(Con),
   R.
 
-load_test_stream(Data, Con) ->
+load_test_stream(Data, Con, BatchSize) ->
   Stream = teledamus:new_stream(Con),
   {keyspace, "examples"} = teledamus:query(Stream, "USE examples"),
   {PrepStmt, _, _} = teledamus:prepare_query(Stream, "INSERT INTO profiles(s_id, c_id, v_id, o_id) VALUES(?, ?, ?, ?)"),
 	{DT, LAT} = try
 		T0 = millis(),
-		SUM_LAT = load_test_int(Stream, PrepStmt, Data),
+		SUM_LAT = load_test_int(Stream, PrepStmt, Data, BatchSize),
 		T1 = millis(),
 		{T1 - T0, round(SUM_LAT / length(Data))}
   catch
     E:EE ->
       error_logger:error_msg("~p:~p, stack=~p~n", [E, EE, erlang:get_stacktrace()])
   end,
-%%   Cnt = case teledamus:query(Stream, "SELECT count(*) FROM profiles", #query_params{consistency_level = one}, infinity) of
-%%           {_, _, XX} -> XX;
-%%           Err -> Err
-%%         end,
-%%   T2 = millis(),
   teledamus:release_stream(Stream),
   [{tm, DT}, {lat, LAT}].
 
 
+load_test_multi_stream_multi(StCnt, PrCnt, Count) ->
+  load_test_multi_stream_multi(StCnt, PrCnt, Count, undefined).
+
+load_test_multi_stream_multi(StCnt, PrCnt, Count, BatchSize) ->
+  Ds = lists:map(fun(_I) ->
+    Con = case teledamus:get_connection() of
+      {error, X} ->
+        error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
+        throw(connection_error);
+      CN -> CN
+    end,
+    Data = prepare_data(Count, StCnt),
+    {Con, Data}
+  end, lists:seq(1, PrCnt)),
+  T0 = millis(),
+  lists:foreach(fun({C, Dat}) -> spawn_load_tests_stream(Dat, C, BatchSize) end, Ds),
+  R = wait_for_N(PrCnt * StCnt),
+  T1 = millis(),
+  lists:foreach(fun({C, _Dat}) -> teledamus:release_connection(C) end, Ds),
+  {{total, T1- T0}, R}.
+
+
 load_test_multi_stream(N, Count) ->
+  load_test_multi_stream(N, Count, undefined).
+
+load_test_multi_stream(N, Count, BatchSize) ->
   Con = case teledamus:get_connection() of
           {error, X} ->
             error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
@@ -99,82 +123,109 @@ load_test_multi_stream(N, Count) ->
         end,
 	Data = prepare_data(Count, N),
   T = millis(),
-  spawn_load_tests_stream(Data, Con),
+  spawn_load_tests_stream(Data, Con, BatchSize),
   R = wait_for_N(N),
 	T1 = millis(),
   teledamus:release_connection(Con),
   {{total, T1 - T}, R}.
 
 
-load_test_multi_stream(Data) ->
-	Con = case teledamus:get_connection() of
-					{error, X} ->
-						error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
-						throw(connection_error);
-					C -> C
-				end,
-	T = millis(),
-	spawn_load_tests_stream(Data, Con),
-	R = wait_for_N(length(Data)),
-	T1 = millis(),
-	teledamus:release_connection(Con),
-	{{total, T1 - T}, R}.
+%% load_test_multi_stream(Data) ->
+%% 	Con = case teledamus:get_connection() of
+%% 					{error, X} ->
+%% 						error_logger:error_msg("Connection error: ~p, ~p", [X, erlang:get_stacktrace()]),
+%% 						throw(connection_error);
+%% 					C -> C
+%% 				end,
+%% 	T = millis(),
+%% 	spawn_load_tests_stream(Data, Con, 1),
+%% 	R = wait_for_N(length(Data)),
+%% 	T1 = millis(),
+%% 	teledamus:release_connection(Con),
+%% 	{{total, T1 - T}, R}.
 
 load_test_multi(N, Count) ->
+  load_test_multi(N, Count, undefined).
+
+load_test_multi(N, Count, BatchSize) ->
 	Data = prepare_data(Count, N),
   T = millis(),
-  spawn_load_tests(Data),
+  spawn_load_tests(Data, BatchSize),
   R = wait_for_N(N),
   {{total, millis() - T}, R}.
 
 wait_for_N(0) -> [];
 wait_for_N(N) ->
-%%   error_logger:info_msg("Waiting for ~p~n", [N]),
   XX = receive
-    X ->
-%%       error_logger:info_msg("~p: Received ~p~n", [N, X]),
-      X
+    X -> X
   end,
   [XX | wait_for_N(N - 1)].
 
-spawn_load_tests([]) -> ok;
-spawn_load_tests([Data | T]) ->
-  Parent = self(),
-  spawn(fun() ->
-%%     error_logger:info_msg("Spawning ~p~n", [N]),
-    R = load_test(Data),
-%%     error_logger:info_msg("Completed ~p:~p~n", [N, R]),
-    Parent ! R
-  end),
-  spawn_load_tests(T).
+spawn_load_tests(Data) ->
+  spawn_load_tests(Data, undefined).
 
-spawn_load_tests_stream([], _Con) -> ok;
-spawn_load_tests_stream([Data | T], Con) ->
+spawn_load_tests([], _BatchSize) -> ok;
+spawn_load_tests([Data | T], BatchSize) ->
   Parent = self(),
   spawn(fun() ->
-%%     error_logger:info_msg("Spawning ~p~n", [N]),
-    R = load_test_stream(Data, Con),
-%%     error_logger:info_msg("Completed ~p:~p~n", [N, R]),
+    R = load_test(Data, BatchSize),
     Parent ! R
   end),
-  spawn_load_tests_stream(T, Con).
+  spawn_load_tests(T, BatchSize).
+
+spawn_load_tests_stream([], _Con, _BatchSize) -> ok;
+spawn_load_tests_stream([Data | T], Con, BatchSize) ->
+  Parent = self(),
+  spawn(fun() ->
+    R = load_test_stream(Data, Con, BatchSize),
+    Parent ! R
+  end),
+  spawn_load_tests_stream(T, Con, BatchSize).
 
 p(Str, Id, Count) -> {varchar, Str ++ integer_to_list(Id) ++ "_" ++ integer_to_list(Count)}.
 
-load_test_int(_Con, _PrepStmt, []) -> 0;
-load_test_int(Con, PrepStmt, [H | T]) ->
+mk_batch_query(Stmt, L) ->
+  QS = lists:map(fun(P) ->
+    #query_params{bind_values = VS} = P,
+    {Stmt, VS}
+  end, L),
+  #batch_query{batch_type = ?BATCH_UNLOGGED, consistency_level = one, queries = QS}.
+
+load_test_int_batch(_Con, _PrepStmt, [], _BatchSize) -> 0;
+load_test_int_batch(Con, PrepStmt, L, BatchSize) ->
+  {H, T} = case length(L) < BatchSize of
+    true -> {L, []};
+    false -> lists:split(BatchSize, L)
+  end,
+  Batch = mk_batch_query(PrepStmt, H),
+  T0 = millis(),
+  try
+    teledamus:batch_query(Con, Batch, 5000)
+  catch
+    E:EE ->
+      error_logger:error_msg("~p: Exception ~p:~p, stack=~p", [self(), E, EE, erlang:get_stacktrace()])
+  end,
+  T1 = millis(),
+  R = T1 - T0,
+  R + load_test_int_batch(Con, PrepStmt, T, BatchSize).
+
+load_test_int(Con, PrepStmt, L, undefined) ->
+  load_test_int_single(Con, PrepStmt, L);
+load_test_int(Con, PrepStmt, L, BatchSize) ->
+  load_test_int_batch(Con, PrepStmt, L, BatchSize).
+
+load_test_int_single(_Con, _PrepStmt, []) -> 0;
+load_test_int_single(Con, PrepStmt, [H | T]) ->
 	T0 = millis(),
   try
-%% 		error_logger:info_msg("lti:exec:s id=~p", [Id]),
     teledamus:execute_query(Con, PrepStmt, H, 5000)
   catch
     E:EE ->
       error_logger:error_msg("~p: Exception ~p:~p, stack=~p", [self(), E, EE, erlang:get_stacktrace()])
   end,
 	T1 = millis(),
-%% 		error_logger:info_msg("lti:exec:f id=~p, dt=~p", [Id, T1 - T0]),
   R = T1 - T0,
-  R + load_test_int(Con, PrepStmt, T).
+  R + load_test_int_single(Con, PrepStmt, T).
 
 millis() ->
   {X, _} = statistics(wall_clock),
