@@ -27,22 +27,13 @@ options(#stream{stream_pid = Pid}, Timeout) ->
 query(#stream{stream_pid = Pid}, Query, Params, Timeout) ->
   gen_server:call(Pid, {query, Query, Params, Timeout}, Timeout).
 
-query(#stream{stream_pid = Pid}, Query, Params, Timeout, UseCache) ->
+query(#stream{stream_pid = Pid, connection = Con}, Query, Params, Timeout, UseCache) ->
   case UseCache of
     true ->
-      case from_cache(Pid, Query, Timeout) of
-        {ok, Id} ->
-          execute_query(Pid, Id, Params, Timeout);
-        _ ->
-          case prepare_query(Pid, Query, Timeout) of
-            {Id, _, _} ->
-              to_cache(Pid, Query, Id, Timeout),
-              execute_query(Pid, Id, Params, Timeout);
-            Err ->
-              Err
-          end
+      case stmt_cache:cache(Query, Con, Timeout) of
+        {ok, Id} -> execute_query(Pid, Id, Params, Timeout);
+        Err -> Err
       end;
-
     false ->
       query(Pid, Query, Params, Timeout)
   end.

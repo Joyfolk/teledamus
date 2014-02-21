@@ -49,6 +49,7 @@ start_link(Args) ->
 		#rr_state{resources = Nodes, rr = Nodes}
 	end,
 	Compression = proplists:get_value(compression, Args, none),
+  stmt_cache:init(),
 	gen_server:start_link({local, ?SERVER}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression], []).
 
 prepare_transport(gen_tcp, Args) ->

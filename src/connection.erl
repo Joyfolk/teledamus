@@ -8,8 +8,8 @@
 
 %% API
 -export([start_link/4]).
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/3, to_cache/4, query/5, prepare_query/4, batch_query/4,
-         new_stream/2, release_stream/2]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/1, to_cache/2, query/5, prepare_query/4, batch_query/4,
+  new_stream/2, release_stream/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -17,8 +17,7 @@
 -define(SERVER, ?MODULE).
 -define(DEFAULT_STREAM_ID, 0).
 
--record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy,
-                stms_cache :: dict(), streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
+-record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy, streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
 
 
 %%%===================================================================
@@ -40,19 +39,10 @@ query({connection, Pid}, Query, Params, Timeout) ->
 query(Con, Query, Params, Timeout, UseCache) ->
   case UseCache of
     true ->
-      case from_cache(Con, Query, Timeout) of
-        {ok, Id} ->
-          execute_query(Con, Id, Params, Timeout);
-        _ ->
-          case prepare_query(Con, Query, Timeout) of
-            {Id, _, _} ->
-              to_cache(Con, Query, Id, Timeout),
-              execute_query(Con, Id, Params, Timeout);
-            Err ->
-              Err
-          end
+      case stmt_cache:cache(Query, Con, Timeout) of
+        {ok, Id} -> execute_query(Con, Id, Params, Timeout);
+        Err -> Err
       end;
-
     false ->
       query(Con, Query, Params, Timeout)
   end.
@@ -61,15 +51,13 @@ query(Con, Query, Params, Timeout, UseCache) ->
 prepare_query(Con, Query, Timeout) ->
   prepare_query(Con, Query, Timeout, false).
 
-prepare_query(Con = {connection, Pid}, Query, Timeout, UseCache) ->
+prepare_query({connection, Pid}, Query, Timeout, UseCache) ->
   R = gen_server:call(Pid, {prepare, Query, ?DEFAULT_STREAM_ID}, Timeout),
   case {UseCache, R} of
-    {true, {Id, _, _}} ->
-      to_cache(Con, Query, Id, Timeout),
-      R;
-    {false, _} ->
-      R
-  end.
+    {true, {Id, _, _}} -> stmt_cache:to_cache(Query, Id);
+    _ -> ok
+  end,
+  R.
 
 execute_query({connection, Pid}, ID, Params, Timeout) ->
   gen_server:call(Pid, {execute, ID, Params, ?DEFAULT_STREAM_ID}, Timeout).
@@ -81,11 +69,8 @@ batch_query(Con = {connection, Pid}, Batch = #batch_query{queries = Queries}, Ti
   case UseCache of
     true ->
       NBatch = Batch#batch_query{queries = lists:map(
-        fun({Id, Args}) when is_binary(Id) ->
-          {Id, Args};
-          ({Query, Args}) when is_list(Query) ->
-            {Id, _, _} = prepare_query(Con, Query, Timeout, true),
-            {Id, Args}
+        fun({Id, Args}) when is_binary(Id) -> {Id, Args};
+           ({Query, Args}) when is_list(Query) -> stmt_cache:cache(Query, Con, Timeout)
         end, Queries)},
       gen_server:call(Pid, {batch, NBatch, ?DEFAULT_STREAM_ID}, Timeout);
     false ->
@@ -98,11 +83,11 @@ subscribe_events({connection, Pid}, EventTypes, Timeout) ->
 get_socket({connection, Pid}) ->
   gen_server:call(Pid, get_socket).
 
-from_cache({connection, Pid}, Query, Timeout) ->
-  gen_server:call(Pid, {from_cache, Query}, Timeout).
+from_cache(Query) ->
+  stmt_cache:from_cache(Query).
 
-to_cache({connection, Pid}, Query, Id, Timeout) ->
-  gen_server:call(Pid, {to_cache, Query, Id}, Timeout).
+to_cache(Query, PreparedStmtId) ->
+  stmt_cache:to_cache(Query, PreparedStmtId).
 
 
 %%--------------------------------------------------------------------
@@ -158,7 +143,7 @@ update_state(StreamId, From, State) ->
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} | {reply, Reply, State, Timeout} | {noreply, State} | {noreply, State, Timeout} | {stop, Reason, Reply, State} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(Request, From, State = #state{socket = Socket, transport = Transport, compression = Compression, streams = Streams}) ->
+handle_call(Request, From, State = #state{socket = Socket, transport = _Transport, compression = _Compression, streams = Streams}) ->
   case Request of
     new_stream ->
       case find_next_stream_id(Streams) of
@@ -177,12 +162,6 @@ handle_call(Request, From, State = #state{socket = Socket, transport = Transport
     {release_stream, #stream{stream_id = Id}} ->
       %% todo: close something?
       {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
-
-    {from_cache, Query} ->
-      {reply, dict:find(Query, State#state.stms_cache), State};
-
-    {to_cache, Query, Id} ->
-      {reply, ok, State#state{stms_cache = dict:store(Query, Id, State#state.stms_cache)}};
 
     get_socket ->
       {reply, State#state.socket, Socket};
@@ -214,7 +193,7 @@ handle_cast(Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = Transport, buffer = Buffer, compression = Compression} = State) ->
+handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport, buffer = Buffer, compression = Compression} = State) ->
   case native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
     {undefined, NewBuffer} ->
 %%       set_active(Socket, Transport),
@@ -298,7 +277,7 @@ set_active(Socket, Transport) ->
   end.
 
 
-handle_frame(Frame = #frame{header = #header{opcode = OpCode}}, State = #state{caller = Caller, transport = Transport, streams = Streams}) ->
+handle_frame(Frame = #frame{header = #header{opcode = OpCode}}, State = #state{caller = Caller, transport = _Transport, streams = Streams}) ->
 %%   set_active(State#state.socket, Transport),
   StreamId = (Frame#frame.header)#header.stream,
   UseStream = if StreamId > 0 andalso StreamId < 128 -> dict:is_key(StreamId, Streams); true -> false end,
@@ -483,7 +462,7 @@ handle_request(Request, From, State = #state{socket = Socket, transport = Transp
       send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body}),
       update_state(StreamId, From, State);
 
-      _ ->
-       error_logger:error_msg("Unknown request ~p~n", [Request]),
-       {noereply, State#state{caller = undefined}}
-end.
+    _ ->
+      error_logger:error_msg("Unknown request ~p~n", [Request]),
+      {noereply, State#state{caller = undefined}}
+  end.
