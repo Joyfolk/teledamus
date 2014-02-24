@@ -233,7 +233,7 @@ handle_info(Request, State = #state{caller = Caller}) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
 terminate(_Reason, #state{caller = Id, connection = {connection, Pid}}) ->
 	case is_process_alive(Pid) of
-		true ->	connection:release_stream(#stream{connection = Pid, stream_id = Id, stream_pid = self()}, 1000), ok;
+		true ->	connection:release_stream(#stream{connection = {connection, Pid}, stream_id = Id, stream_pid = self()}, 1000), ok;
 		_ -> ok
 	end.
 
