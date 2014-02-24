@@ -1,7 +1,7 @@
 -module(examples).
 
 -export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2,
-         load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, prepare_data/2, load_test_multi_stream_multi/3]).
+         load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
 
@@ -66,7 +66,7 @@ load_test_stream(Count, BatchSize) ->
             throw(connection_error);
           C -> C
         end,
-	Data = prepare_data(Count, undefined),
+	[Data] = prepare_data(Count, 1),
   R = load_test_stream(Data, Con, BatchSize),
   teledamus:release_connection(Con),
   R.
