@@ -1,5 +1,4 @@
 -module(examples).
--author("Mikhail.Turnovskiy").
 
 -export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2,
          load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, prepare_data/2, load_test_multi_stream_multi/3]).

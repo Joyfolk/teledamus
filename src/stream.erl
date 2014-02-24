@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([start/3]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/3, to_cache/4, query/5, prepare_query/4, batch_query/4, handle_frame/2]).
@@ -11,21 +11,22 @@
 
 -include_lib("native_protocol.hrl").
 
--record(state, {connection :: connection(), id :: 1..127, caller :: pid()}).
+
+-record(state, {connection :: connection(), id :: 1..127, caller :: pid(), compression = none :: compression()}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
--spec(start_link(connection(), pos_integer()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(Connection, StreamId) ->
-  gen_server:start_link(?MODULE, [Connection, StreamId], []).
+-spec(start(connection(), pos_integer(), compression()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start(Connection, StreamId, Compression) ->
+  gen_server:start(?MODULE, [Connection, StreamId, Compression], []).
 
 options(#stream{stream_pid = Pid}, Timeout) ->
-  gen_server:call(Pid, {options, Timeout}, Timeout).
+  gen_server:call(Pid, options, Timeout).
 
 query(#stream{stream_pid = Pid}, Query, Params, Timeout) ->
-  gen_server:call(Pid, {query, Query, Params, Timeout}, Timeout).
+  gen_server:call(Pid, {query, Query, Params}, Timeout).
 
 query(#stream{stream_pid = Pid, connection = Con}, Query, Params, Timeout, UseCache) ->
   case UseCache of
@@ -43,7 +44,7 @@ prepare_query(#stream{stream_pid = Pid}, Query, Timeout) ->
   prepare_query(#stream{stream_pid = Pid}, Query, Timeout, false).
 
 prepare_query(Stream = #stream{stream_pid = Pid}, Query, Timeout, UseCache) ->
-  R = gen_server:call(Pid, {prepare, Query, Timeout}, Timeout),
+  R = gen_server:call(Pid, {prepare, Query}, Timeout),
   case {UseCache, R} of
     {true, {Id, _, _}} ->
       to_cache(Stream, Query, Id, Timeout),
@@ -53,10 +54,10 @@ prepare_query(Stream = #stream{stream_pid = Pid}, Query, Timeout, UseCache) ->
   end.
 
 execute_query(#stream{stream_pid = Pid}, ID, Params, Timeout) ->
-  gen_server:call(Pid, {execute, ID, Params, Timeout}, Timeout).
+  gen_server:call(Pid, {execute, ID, Params}, Timeout).
 
 batch_query(#stream{stream_pid = Pid}, Batch, Timeout) ->
-  gen_server:call(Pid, {batch, Batch, Timeout}, Timeout).
+  gen_server:call(Pid, {batch, Batch}, Timeout).
 
 batch_query(Stream = #stream{stream_pid = Pid}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
   case UseCache of
@@ -68,20 +69,20 @@ batch_query(Stream = #stream{stream_pid = Pid}, Batch = #batch_query{queries = Q
             {Id, _, _} = prepare_query(Stream, Query, Timeout, true),
             {Id, Args}
         end, Queries)},
-      gen_server:call(Pid, {batch, NBatch, Timeout}, Timeout);
+      gen_server:call(Pid, {batch, NBatch}, Timeout);
 
     false ->
-      gen_server:call(Pid, {batch, Batch, Timeout}, Timeout)
+      gen_server:call(Pid, {batch, Batch}, Timeout)
   end.
 
 subscribe_events(#stream{stream_pid = Pid}, EventTypes, Timeout) ->
-  gen_server:call(Pid, {register, EventTypes, Timeout}, Timeout).
+  gen_server:call(Pid, {register, EventTypes}, Timeout).
 
 from_cache(#stream{stream_pid = Pid}, Query, Timeout) ->
-  gen_server:call(Pid, {from_cache, Query, Timeout}, Timeout).
+  gen_server:call(Pid, {from_cache, Query}, Timeout).
 
 to_cache(#stream{stream_pid = Pid}, Query, Id, Timeout) ->
-  gen_server:call(Pid, {to_cache, Query, Id, Timeout}, Timeout).
+  gen_server:call(Pid, {to_cache, Query, Id}, Timeout).
 
 
 
@@ -90,50 +91,62 @@ to_cache(#stream{stream_pid = Pid}, Query, Id, Timeout) ->
 %%%===================================================================
 
 -spec(init(Args :: term()) -> {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} | {stop, Reason :: term()} | ignore).
-init([Connection, StreamId]) ->
-  {ok, #state{connection = Connection, id = StreamId}}.
+init([Connection, StreamId, Compression]) ->
+	process_flag(trap_exit, true),
+  {ok, #state{connection = Connection, id = StreamId, compression = Compression}}.
 
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) -> {reply, Reply :: term(), NewState :: #state{}} | {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
             {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, From, State = #state{id = StreamId, connection = {connection, Connection}}) ->
+handle_call(Request, From, State = #state{id = StreamId, connection = {connection, Connection}, compression = Compression}) ->
   case Request of
-    {options, _Timeout} ->
-      gen_server:cast(Connection, {options, StreamId}),
+    options ->
+			Frame = #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {query, Query, Params, _Timeout} ->
-      gen_server:cast(Connection, {query, Query, Params, StreamId}),
+    {query, Query, Params} ->
+			Body = native_parser:encode_query(Query, Params),
+			Frame = #frame{header = #header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {prepare, Query, _Timeout} ->
-      gen_server:cast(Connection, {prepare, Query, StreamId}),
+    {prepare, Query} ->
+			Body = native_parser:encode_long_string(Query),
+			Frame = #frame{header = #header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {execute, ID, Params, _Timeout} ->
-      gen_server:cast(Connection, {execute, ID, Params, StreamId}),
+    {execute, ID, Params} ->
+ 			Body = native_parser:encode_query(ID, Params),
+ 			Frame = #frame{header = #header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {batch, BatchQuery, _Timeout} ->
-      gen_server:cast(Connection, {batch,  BatchQuery, StreamId}),
+    {batch, BatchQuery} ->
+ 			Body = native_parser:encode_batch_query(BatchQuery),
+ 			Frame = #frame{header = #header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {register, EventTypes, _Timeout} ->
-      gen_server:cast(Connection, {register, EventTypes, StreamId}),
+    {register, EventTypes} ->
+			start_gen_event_if_required(),
+			Body = native_parser:encode_event_types(EventTypes),
+			Frame = #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
+			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
 
-    {from_cache, Query, Timeout} ->
-      R = gen_server:call(Connection, {from_cache, Query, StreamId}, Timeout),
-      {reply, R, State};
+    {from_cache, Query} ->
+      {reply, stmt_cache:from_cache(Query), State};
 
-    {to_cache, Query, Id, Timeout} ->
-      R = gen_server:call(Connection, {to_cache, Query, Id, StreamId}, Timeout),
-      {reply, R, State};
+    {to_cache, Query, Id} ->
+      {reply, stmt_cache:to_cache(Query, Id), State};
 
     _ ->
       error_logger:error_msg("Unknown request ~p~n", [Request]),
       {reply, unknown_request, State}
   end.
+
 
 handle_frame(Pid, Frame) ->
   Pid ! {handle_frame, Frame}.
@@ -218,12 +231,21 @@ handle_info(Request, State = #state{caller = Caller}) ->
   end.
 
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
-terminate(Reason, #state{caller = Id, connection = Pid}) ->
-  error_logger:error_msg("Stopping stream ~p because of ~p~n", [Id, Reason]),
-  connection:release_stream(#stream{connection = Pid, stream_id = Id, stream_pid = self()}, 1000),
-  ok.
+terminate(_Reason, #state{caller = Id, connection = {connection, Pid}}) ->
+	case is_process_alive(Pid) of
+		true ->	connection:release_stream(#stream{connection = Pid, stream_id = Id, stream_pid = self()}, 1000), ok;
+		_ -> ok
+	end.
 
 -spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{}, Extra :: term()) -> {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
+
+start_gen_event_if_required() ->
+	case whereis(cassandra_events) of
+		undefined ->
+			gen_event:start_link(cassandra_events);
+		_ ->
+			ok
+	end.

@@ -7,15 +7,16 @@
 -type socket() :: gen_tcp:socket() | ssl:sslsocket().
 
 %% API
--export([start_link/4]).
+-export([start/4, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/1, to_cache/2, query/5, prepare_query/4, batch_query/4,
-  new_stream/2, release_stream/2]).
+         new_stream/2, release_stream/2, send_frame/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
 -define(DEFAULT_STREAM_ID, 0).
+-define(DEF_STREAM_ETS, default_streams).
 
 -record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy, streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
 
@@ -24,61 +25,52 @@
 %%% API
 %%%===================================================================
 
+send_frame(Connection, Frame) ->
+	gen_server:cast(Connection, {send_frame, Frame}).
+
 new_stream({connection, Pid}, Timeout) ->
   gen_server:call(Pid, new_stream, Timeout).
 
 release_stream(S = #stream{connection = {connection, Pid}}, Timeout) ->
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
+
 options({connection, Pid}, Timeout) ->
-  gen_server:call(Pid, {options, ?DEFAULT_STREAM_ID}, Timeout).
+  Stream = get_default_stream(Pid),
+	error_logger:info_msg("Stream=<~p>", [Stream]),
+  stream:options(Stream, Timeout).
 
 query({connection, Pid}, Query, Params, Timeout) ->
-  gen_server:call(Pid, {query, Query, Params, ?DEFAULT_STREAM_ID}, Timeout).
+	Stream = get_default_stream(Pid),
+	stream:query(Stream, Query, Params, Timeout).
 
-query(Con, Query, Params, Timeout, UseCache) ->
-  case UseCache of
-    true ->
-      case stmt_cache:cache(Query, Con, Timeout) of
-        {ok, Id} -> execute_query(Con, Id, Params, Timeout);
-        Err -> Err
-      end;
-    false ->
-      query(Con, Query, Params, Timeout)
-  end.
+query({connection, Pid}, Query, Params, Timeout, UseCache) ->
+	Stream = get_default_stream(Pid),
+	stream:query(Stream, Query, Params, Timeout, UseCache).
 
-
-prepare_query(Con, Query, Timeout) ->
-  prepare_query(Con, Query, Timeout, false).
+prepare_query({connection, Pid}, Query, Timeout) ->
+	Stream = get_default_stream(Pid),
+  stream:prepare_query(Stream, Query, Timeout).
 
 prepare_query({connection, Pid}, Query, Timeout, UseCache) ->
-  R = gen_server:call(Pid, {prepare, Query, ?DEFAULT_STREAM_ID}, Timeout),
-  case {UseCache, R} of
-    {true, {Id, _, _}} -> stmt_cache:to_cache(Query, Id);
-    _ -> ok
-  end,
-  R.
+	Stream = get_default_stream(Pid),
+	stream:prepare_query(Stream, Query, Timeout, UseCache).
 
 execute_query({connection, Pid}, ID, Params, Timeout) ->
-  gen_server:call(Pid, {execute, ID, Params, ?DEFAULT_STREAM_ID}, Timeout).
+	Stream = get_default_stream(Pid),
+  stream:execute_query(Stream, ID, Params, Timeout).
 
 batch_query({connection, Pid}, Batch, Timeout) ->
-  gen_server:call(Pid, {batch, Batch, ?DEFAULT_STREAM_ID}, Timeout).
+	Stream = get_default_stream(Pid),
+  stream:batch_query(Stream, Batch, Timeout).
 
-batch_query(Con = {connection, Pid}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
-  case UseCache of
-    true ->
-      NBatch = Batch#batch_query{queries = lists:map(
-        fun({Id, Args}) when is_binary(Id) -> {Id, Args};
-           ({Query, Args}) when is_list(Query) -> stmt_cache:cache(Query, Con, Timeout)
-        end, Queries)},
-      gen_server:call(Pid, {batch, NBatch, ?DEFAULT_STREAM_ID}, Timeout);
-    false ->
-      gen_server:call(Pid, {batch, Batch, ?DEFAULT_STREAM_ID}, Timeout)
-  end.
+batch_query({connection, Pid}, Batch, Timeout, UseCache) ->
+	Stream = get_default_stream(Pid),
+	stream:batch_query(Stream, Batch, Timeout, UseCache).
 
 subscribe_events({connection, Pid}, EventTypes, Timeout) ->
-  gen_server:call(Pid, {register, EventTypes, ?DEFAULT_STREAM_ID}, Timeout).
+	Stream = get_default_stream(Pid),
+	stream:subscribe_events(Stream, EventTypes, Timeout).
 
 get_socket({connection, Pid}) ->
   gen_server:call(Pid, get_socket).
@@ -89,16 +81,22 @@ from_cache(Query) ->
 to_cache(Query, PreparedStmtId) ->
   stmt_cache:to_cache(Query, PreparedStmtId).
 
+prepare_ets() ->
+	case ets:info(?DEF_STREAM_ETS) of
+		undefined -> ets:new(?DEF_STREAM_ETS, [named_table, set, public, {write_concurrency, false}, {read_concurrency, true}]);
+		_ -> ?DEF_STREAM_ETS
+	end.
+
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @spec start() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link(Socket, Credentials, Transport, Compression) ->
-  gen_server:start_link(?MODULE, [Socket, Credentials, Transport, Compression], []).
+start(Socket, Credentials, Transport, Compression) ->
+  gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -116,23 +114,34 @@ start_link(Socket, Credentials, Transport, Compression) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Socket, Credentials, Transport, Compression]) ->
-  case startup(Socket, Credentials, Transport, Compression) of
+  RR = case startup(Socket, Credentials, Transport, Compression) of
     ok ->
-      set_active(Socket, Transport),
-      {ok, #state{socket = Socket, transport = Transport, compression = Compression, stms_cache = dict:new(), streams = dict:new()}};
+			try
+        set_active(Socket, Transport),
+				{ok, StreamId} = stream:start({connection, self()}, ?DEFAULT_STREAM_ID, Compression),
+				monitor(process, StreamId),
+				DefStream = #stream{connection = {connection, self()}, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
+				ets:insert(?DEF_STREAM_ETS, {self(), DefStream}),
+        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:append(?DEFAULT_STREAM_ID, DefStream, dict:new())}}
+		  catch
+				E: EE ->
+				  {stop, {error, E, EE}}
+		  end;
     {error, Reason} ->
       {stop, Reason};
     R ->
       {stop, {unknown_error, R}}
-  end.
+  end,
+  RR.
 
-update_state(StreamId, From, State) ->
-  if
-    is_integer(StreamId) andalso StreamId > 0 ->
-      {noreply, State};
-    true ->
-      {noreply, State#state{caller = From}}
-  end.
+%% update_state(StreamId, From, State) ->
+%%   if
+%%     is_integer(StreamId) andalso StreamId > 0 ->
+%%       {noreply, State}.
+%% ;
+%%     true ->
+%%       {noreply, State#state{caller = From}}
+%%   end.
 
 
 %%--------------------------------------------------------------------
@@ -143,14 +152,14 @@ update_state(StreamId, From, State) ->
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} | {reply, Reply, State, Timeout} | {noreply, State} | {noreply, State, Timeout} | {stop, Reason, Reply, State} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(Request, From, State = #state{socket = Socket, transport = _Transport, compression = _Compression, streams = Streams}) ->
+handle_call(Request, _From, State = #state{socket = Socket, transport = _Transport, compression = Compression, streams = Streams}) ->
   case Request of
     new_stream ->
       case find_next_stream_id(Streams) of
         no_streams_available ->
           {reply, {error, no_streams_available}, State};
         StreamId ->
-          case stream:start_link({connection, self()}, StreamId) of
+          case stream:start({connection, self()}, StreamId, Compression) of
             {ok, StreamPid} ->
               Stream = #stream{connection = {connection, self()}, stream_pid = StreamPid, stream_id = StreamId},
               {reply, Stream, State#state{streams = dict:append(StreamId, Stream, Streams)}};
@@ -166,9 +175,10 @@ handle_call(Request, From, State = #state{socket = Socket, transport = _Transpor
     get_socket ->
       {reply, State#state.socket, Socket};
 
-    _ ->
-      handle_request(Request, From, State)
-  end.
+		_ ->
+			error_logger:error_msg("Unknown request ~p~n", [Request]),
+			{reply, {error, unknown_request}, State#state{caller = undefined}}
+	end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -180,8 +190,17 @@ handle_call(Request, From, State = #state{socket = Socket, transport = _Transpor
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(Request, State) ->
-  handle_request(Request, undefined, State).
+handle_cast(Request, State = #state{transport = Transport, socket = Socket}) ->
+	case Request of
+		{send_frame, Frame} ->
+			Transport:send(Socket, Frame),
+			{noreply, State};
+
+		_ ->
+			error_logger:error_msg("Unknown request ~p~n", [Request]),
+			{noreply, State#state{caller = undefined}}
+	end.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -226,10 +245,16 @@ handle_info({ssl_error, _Socket, Reason}, State) ->
   error_logger:error_msg("SSL error [~p]~n", [Reason]),
   {stop, {tcp_error, Reason}, State};
 
+handle_info({'Down', From, Reason}, State) ->  %% todo
+	error_logger:error_msg("Child killed ~p: ~p, state=~p", [From, Reason, State]),
+	case From =:= get_default_stream(self()) of
+		true -> {stop, {default_stream_death, Reason}, State};
+		_ -> {noreply, State}
+	end;
+
 handle_info(Info, State) ->
   error_logger:warning_msg("Unhandled info: ~p~n", [Info]),
   {noreply, State}.
-
 
 %%--------------------------------------------------------------------
 %% @private
@@ -243,6 +268,7 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, #state{socket = Socket, transport = Transport}) ->
+	ets:delete(?DEF_STREAM_ETS, self()),
   Transport:close(Socket).
 
 %%--------------------------------------------------------------------
@@ -277,56 +303,18 @@ set_active(Socket, Transport) ->
   end.
 
 
-handle_frame(Frame = #frame{header = #header{opcode = OpCode}}, State = #state{caller = Caller, transport = _Transport, streams = Streams}) ->
+handle_frame(Frame = #frame{header = Header}, State = #state{streams = Streams}) ->
 %%   set_active(State#state.socket, Transport),
-  StreamId = (Frame#frame.header)#header.stream,
-  UseStream = if StreamId > 0 andalso StreamId < 128 -> dict:is_key(StreamId, Streams); true -> false end,
-  if
-    UseStream ->
-      [Stream] = dict:fetch(StreamId, Streams),
-      stream:handle_frame(Stream#stream.stream_pid, Frame),
-      {noreply, State};
-
-    true ->
-      case OpCode of
-        ?OPC_ERROR ->
-          Error = native_parser:parse_error(Frame),
-          error_logger:error_msg("CQL error ~p~n", [Error]),
-          reply_if_needed(Caller, Error),
-          {noreply, State#state{caller = undefined}};
-        ?OPC_READY ->
-          reply_if_needed(Caller, ok),
-          {noreply, State#state{caller = undefined}};
-        ?OPC_AUTHENTICATE ->
-          throw({not_supported_option, authentificate}),
-          {noreply, State};
-        ?OPC_SUPPORTED ->
-          {Options, _} = native_parser:parse_string_multimap(Frame#frame.body),
-          reply_if_needed(Caller, Options),
-          {noreply, State#state{caller = undefined}};
-        ?OPC_RESULT ->
-          Result = native_parser:parse_result(Frame),
-          reply_if_needed(Caller, Result),
-          {noreply, State#state{caller = undefined}};
-        ?OPC_EVENT ->
-          Result = native_parser:parse_event(Frame),
-          gen_event:notify(cassandra_events, Result),
-          {noreply, State};
-        _ ->
-          error_logger:warning_msg("Unsupported OpCode: ~p~n", [OpCode]),
-          {noreply, State#state{caller = undefined}}
-      end
-  end.
-
-
-reply_if_needed(Caller, Reply) ->
-  case Caller of
-    undefined ->
-      ok;
-    _ ->
-      gen_server:reply(Caller, Reply)
-  end.
-
+	StreamId = Header#header.stream,
+	case dict:is_key(StreamId, Streams) of
+		true ->
+			[Stream] = dict:fetch(StreamId, Streams),
+			stream:handle_frame(Stream#stream.stream_pid, Frame);
+		false ->
+			Stream = get_default_stream(self()),
+			stream:handle_frame(Stream#stream.stream_pid, Frame)
+	end,
+	{noreply, State}.
 
 startup_opts(Compression) ->
   CQL = [{<<"CQL_VERSION">>,  ?CQL_VERSION}],
@@ -407,15 +395,6 @@ authenticate(Socket, Authenticator, Credentials, Transport, Compression) ->
   end.
 
 
-start_gen_event_if_required() ->
-  case whereis(cassandra_events) of
-    undefined ->
-      gen_event:start_link(cassandra_events);
-    _ ->
-      ok
-  end.
-
-
 find_next_stream_id(Streams) ->
   find_next_stream_id(1, Streams).
 
@@ -429,40 +408,6 @@ find_next_stream_id(Id, Streams) ->
       find_next_stream_id(Id + 1, Streams)
   end.
 
-
-handle_request(Request, From, State = #state{socket = Socket, transport = Transport, compression = Compression}) ->
-  case Request of
-    {options, StreamId} ->
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>}),
-      update_state(StreamId, From, State);
-
-    {query, Query, Params, StreamId} ->
-      Body = native_parser:encode_query(Query, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body}),
-      update_state(StreamId, From, State);
-
-    {prepare, Query, StreamId} ->
-      Body = native_parser:encode_long_string(Query),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body}),
-      update_state(StreamId, From, State);
-
-    {execute, ID, Params, StreamId} ->
-      Body = native_parser:encode_query(ID, Params),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body}),
-      update_state(StreamId, From, State);
-
-    {batch, BatchQuery, StreamId} ->
-      Body = native_parser:encode_batch_query(BatchQuery),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body}),
-      update_state(StreamId, From, State);
-
-    {register, EventTypes, StreamId} ->
-      start_gen_event_if_required(),
-      Body = native_parser:encode_event_types(EventTypes),
-      send(Socket, Transport, Compression, #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body}),
-      update_state(StreamId, From, State);
-
-    _ ->
-      error_logger:error_msg("Unknown request ~p~n", [Request]),
-      {noereply, State#state{caller = undefined}}
-  end.
+get_default_stream(Pid) ->
+	[{_, Stream}] = ets:lookup(?DEF_STREAM_ETS, Pid),
+	Stream.

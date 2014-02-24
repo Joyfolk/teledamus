@@ -50,6 +50,7 @@ start_link(Args) ->
 	end,
 	Compression = proplists:get_value(compression, Args, none),
   stmt_cache:init(),
+	connection:prepare_ets(),
 	gen_server:start_link({local, ?SERVER}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression], []).
 
 prepare_transport(gen_tcp, Args) ->
@@ -109,7 +110,8 @@ handle_call(Request, From, State) ->
             try
               case Transport:connect(Host, Port, Opts) of
                 {ok, Socket} ->
-                  {ok, Connection} = connection:start_link(Socket, Credentials, Transport, Compression),
+%% 									process_flag(trap_exit, true),
+                  {ok, Connection} = connection:start(Socket, Credentials, Transport, Compression),
                   ok = Transport:controlling_process(Socket, Connection),
                   gen_server:reply(From, {connection, Connection});
                 {error, Reason} ->
@@ -122,10 +124,16 @@ handle_call(Request, From, State) ->
           end),
           {noreply, State#state{nodes = NS}}
 			end;
-	  {release_connection, Connection} ->
-			 Socket = connection:get_socket(Connection),
-       Transport:close(Socket),
-       {reply, ok, State}
+
+		{release_connection, Connection} ->
+			case is_process_alive(element(2, Connection)) of
+				true ->
+					Socket = connection:get_socket(Connection),
+					Transport:close(Socket),
+					{reply, ok, State};
+				false ->
+					{reply, {error, connection_is_not_alive}, State}
+			end
 	end.
 
 %%--------------------------------------------------------------------

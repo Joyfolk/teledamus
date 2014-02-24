@@ -128,6 +128,7 @@
 -type error() :: #error{}.
 -type stream() :: #stream{}.
 -type connection() :: {connection, pid()}.
+-type compression() :: none | lz4 | snappy.
 -type options() :: [{string(), string()}].
 -type keyspace() :: {keyspace, string()}.
 -type schema_change() :: {created, string(), string()} | {updated, string(), string()} | {dropped, string(), string()}.
@@ -136,4 +137,4 @@
 -type metadata() :: {colspec(), paging_state()}.
 -type rows() :: [list()].
 -type result_rows() :: {metadata(), paging_state(), rows()}.
--export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0, stream/0]).
+-export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0, stream/0, compression/0]).

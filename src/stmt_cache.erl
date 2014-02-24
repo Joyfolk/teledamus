@@ -39,7 +39,7 @@ to_cache(Query, PreparedStmtId) ->
 -spec from_cache(list()) -> {ok, binary()} | not_found.
 from_cache(Query) ->
   case ets:lookup(?STMT_CACHE, Query) of
-    [Id] ->
+    [{_, Id}] ->
       {ok, Id};
     [] ->
       not_found
@@ -56,8 +56,8 @@ from_cache(Query) ->
 -spec cache(list(), connection(), timeout()) -> {ok, binary()} | error.
 cache(Query, Con, Timeout) ->
   case ets:lookup(?STMT_CACHE, Query) of
-    [Id] ->
-      {ok, Id};
+		[{_, Id}] ->
+			{ok, Id};
     [] ->
       case connection:prepare_query(Con, Query, Timeout) of
         {PreparedStmtId, _, _} ->

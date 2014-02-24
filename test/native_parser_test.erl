@@ -178,9 +178,9 @@ parse_errors_test() ->
 
 parse_metadata_test() ->
 	NoMetadataHasMorePage = <<6:32/big-signed-integer,2:32/big-signed-integer,3:32/big-signed-integer,0,1,2,3,4>>,
-	?assertEqual({{[], <<0,1,2>>}, <<3,4>>}, native_parser:parse_metadata(NoMetadataHasMorePage)),
+	?assertEqual({{[[], []], <<0,1,2>>}, <<3,4>>}, native_parser:parse_metadata(NoMetadataHasMorePage)),
 	NoMetadataNoPage = <<4:32/big-signed-integer,2:32/big-signed-integer>>,
-	?assertEqual({{[], undefined}, <<>>}, native_parser:parse_metadata(NoMetadataNoPage)),
+	?assertEqual({{[[],[]], undefined}, <<>>}, native_parser:parse_metadata(NoMetadataNoPage)),
 	NoGlobalNoPage = <<0:32,2:32,3:16,97,98,99,2:16,100,101,1:16,102,2:16,2:16,98,99,2:16,100,101,1:16,103,4:16, 1,2,3>>,
 	?assertEqual({{[{"abc", "de", "f", bigint}, {"bc", "de", "g", boolean}], undefined}, <<1,2,3>>}, native_parser:parse_metadata(NoGlobalNoPage)),
 	GlobalPage = <<3:32,3:32, 3:32,1,2,3, 3:16,97,98,99, 2:16,100,101, 1:16,97,2:16, 2:16,98,99,4:16, 3:16,100,101,102,8:16>>,
@@ -197,8 +197,8 @@ parse_row_test() ->
 	M = <<1:32,3:32, 3:16,"abc", 2:16,"de", 1:16,"a",2:16, 2:16,"bc",4:16, 3:16,"def",1:16>>,
 	R = <<3:32, 4:32,1:32,1:32,1:8,4:32,"abcd", 4:32,2:32,1:32,1:8,4:32,"efgh", 4:32,3:32,1:32,0:8,4:32,"klmn">>, %%
 	?assertEqual({[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined,
-		[[1, true, "abcd"], [2, true, "efgh"], [3, false, "klmn"]]},
-		native_parser:parse_result(F#frame{body = <<?RES_ROWS:32,M/binary,R/binary>>})),
+	              [[1, true, "abcd"], [2, true, "efgh"], [3, false, "klmn"]]},
+		            native_parser:parse_result(F#frame{body = <<?RES_ROWS:32,M/binary,R/binary>>})),
 	?assertEqual({<<1,2,3>>, {[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined}, undefined}, native_parser:parse_result(F#frame{body = <<?RES_PREPARED:32,3:16,1,2,3,M/binary>>})),
 	ok.
 

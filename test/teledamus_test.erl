@@ -15,8 +15,11 @@ start() ->
 	{connection, Pid}.
 
 stop(Con) ->
-	teledamus:release_connection(Con),
-	teledamus:stop().
+	try
+		ok = teledamus:release_connection(Con)
+  after
+		teledamus:stop()
+	end.
 
 start_stop_test_() ->
 	{"The application can be started, stopped and has a registered name",
