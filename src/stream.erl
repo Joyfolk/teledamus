@@ -32,11 +32,11 @@ query(#stream{stream_pid = Pid, connection = Con}, Query, Params, Timeout, UseCa
   case UseCache of
     true ->
       case stmt_cache:cache(Query, Con, Timeout) of
-        {ok, Id} -> execute_query(Pid, Id, Params, Timeout);
+        {ok, Id} -> gen_server:call(Pid, {execute, Id, Params}, Timeout);
         Err -> Err
       end;
     false ->
-      query(Pid, Query, Params, Timeout)
+      gen_server:call(Pid, {query, Query, Params}, Timeout)
   end.
 
 
