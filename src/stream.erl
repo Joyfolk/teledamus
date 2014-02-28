@@ -98,7 +98,7 @@ init([Connection, StreamId, Compression]) ->
 
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) -> {reply, Reply :: term(), NewState :: #state{}} | {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
             {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, From, State = #state{id = StreamId, connection = {connection, Connection}, compression = Compression}) ->
+handle_call(Request, From, State = #state{id = StreamId, connection = #connection{pid = Connection}, compression = Compression}) ->
   case Request of
     options ->
 			Frame = #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
@@ -231,9 +231,9 @@ handle_info(Request, State = #state{caller = Caller}) ->
   end.
 
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
-terminate(_Reason, #state{caller = Id, connection = {connection, Pid}}) ->
+terminate(_Reason, #state{caller = Id, connection = #connection{pid = Pid}}) ->
 	case is_process_alive(Pid) of
-		true ->	connection:release_stream(#stream{connection = {connection, Pid}, stream_id = Id, stream_pid = self()}, 1000), ok;
+		true ->	connection:release_stream(#stream{connection = #connection{pid = Pid}, stream_id = Id, stream_pid = self()}, 1000), ok;
 		_ -> ok
 	end.
 

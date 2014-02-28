@@ -123,11 +123,12 @@
 -type batch_query() :: #batch_query{}.
 
 
+-record(connection, {pid :: pid(), host :: list(), port :: pos_integer()}).
 -record(stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
 
 -type error() :: #error{}.
 -type stream() :: #stream{}.
--type connection() :: {connection, pid()}.
+-type connection() :: #connection{}.
 -type compression() :: none | lz4 | snappy.
 -type options() :: [{string(), string()}].
 -type keyspace() :: {keyspace, string()}.

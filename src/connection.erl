@@ -18,61 +18,61 @@
 -define(DEFAULT_STREAM_ID, 0).
 -define(DEF_STREAM_ETS, default_streams).
 
--record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy, streams :: dict()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
+-record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy, streams :: dict(), host :: list(), port :: pos_integer()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
 
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-send_frame(Connection, Frame) ->
-	gen_server:cast(Connection, {send_frame, Frame}).
+send_frame(Pid, Frame) ->
+	gen_server:cast(Pid, {send_frame, Frame}).
 
-new_stream({connection, Pid}, Timeout) ->
+new_stream(#connection{pid = Pid}, Timeout) ->
   gen_server:call(Pid, new_stream, Timeout).
 
-release_stream(S = #stream{connection = {connection, Pid}}, Timeout) ->
+release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
 
-options({connection, Pid}, Timeout) ->
+options(#connection{pid = Pid}, Timeout) ->
   Stream = get_default_stream(Pid),
 	error_logger:info_msg("Stream=<~p>", [Stream]),
   stream:options(Stream, Timeout).
 
-query({connection, Pid}, Query, Params, Timeout) ->
+query(#connection{pid = Pid}, Query, Params, Timeout) ->
 	Stream = get_default_stream(Pid),
 	stream:query(Stream, Query, Params, Timeout).
 
-query({connection, Pid}, Query, Params, Timeout, UseCache) ->
+query(#connection{pid = Pid}, Query, Params, Timeout, UseCache) ->
 	Stream = get_default_stream(Pid),
 	stream:query(Stream, Query, Params, Timeout, UseCache).
 
-prepare_query({connection, Pid}, Query, Timeout) ->
+prepare_query(#connection{pid = Pid}, Query, Timeout) ->
 	Stream = get_default_stream(Pid),
   stream:prepare_query(Stream, Query, Timeout).
 
-prepare_query({connection, Pid}, Query, Timeout, UseCache) ->
+prepare_query(#connection{pid = Pid}, Query, Timeout, UseCache) ->
 	Stream = get_default_stream(Pid),
 	stream:prepare_query(Stream, Query, Timeout, UseCache).
 
-execute_query({connection, Pid}, ID, Params, Timeout) ->
+execute_query(#connection{pid = Pid}, ID, Params, Timeout) ->
 	Stream = get_default_stream(Pid),
   stream:execute_query(Stream, ID, Params, Timeout).
 
-batch_query({connection, Pid}, Batch, Timeout) ->
+batch_query(#connection{pid = Pid}, Batch, Timeout) ->
 	Stream = get_default_stream(Pid),
   stream:batch_query(Stream, Batch, Timeout).
 
-batch_query({connection, Pid}, Batch, Timeout, UseCache) ->
+batch_query(#connection{pid = Pid}, Batch, Timeout, UseCache) ->
 	Stream = get_default_stream(Pid),
 	stream:batch_query(Stream, Batch, Timeout, UseCache).
 
-subscribe_events({connection, Pid}, EventTypes, Timeout) ->
+subscribe_events(#connection{pid = Pid}, EventTypes, Timeout) ->
 	Stream = get_default_stream(Pid),
 	stream:subscribe_events(Stream, EventTypes, Timeout).
 
-get_socket({connection, Pid}) ->
+get_socket(#connection{pid = Pid})->
   gen_server:call(Pid, get_socket).
 
 from_cache(Query) ->
@@ -113,14 +113,15 @@ start(Socket, Credentials, Transport, Compression) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Socket, Credentials, Transport, Compression]) ->
+init([Socket, Credentials, Transport, Compression, Host, Port]) ->
   RR = case startup(Socket, Credentials, Transport, Compression) of
     ok ->
 			try
         set_active(Socket, Transport),
-				{ok, StreamId} = stream:start({connection, self()}, ?DEFAULT_STREAM_ID, Compression),
+        Connection = #connection{pid = self(), host = Host, port = Port},
+				{ok, StreamId} = stream:start(Connection, ?DEFAULT_STREAM_ID, Compression),
 				monitor(process, StreamId),
-				DefStream = #stream{connection = {connection, self()}, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
+				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
 				ets:insert(?DEF_STREAM_ETS, {self(), DefStream}),
         {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:append(?DEFAULT_STREAM_ID, DefStream, dict:new())}}
 		  catch
@@ -152,16 +153,17 @@ init([Socket, Credentials, Transport, Compression]) ->
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} | {reply, Reply, State, Timeout} | {noreply, State} | {noreply, State, Timeout} | {stop, Reason, Reply, State} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(Request, _From, State = #state{socket = Socket, transport = _Transport, compression = Compression, streams = Streams}) ->
+handle_call(Request, _From, State = #state{socket = Socket, transport = _Transport, compression = Compression, streams = Streams, host = Host, port = Port}) ->
   case Request of
     new_stream ->
       case find_next_stream_id(Streams) of
         no_streams_available ->
           {reply, {error, no_streams_available}, State};
         StreamId ->
-          case stream:start({connection, self()}, StreamId, Compression) of
+          Connection = #connection{pid = self(), host = Host, port = Port},
+          case stream:start(Connection, StreamId, Compression) of
             {ok, StreamPid} ->
-              Stream = #stream{connection = {connection, self()}, stream_pid = StreamPid, stream_id = StreamId},
+              Stream = #stream{connection = Connection, stream_pid = StreamPid, stream_id = StreamId},
               {reply, Stream, State#state{streams = dict:append(StreamId, Stream, Streams)}};
             {error, X} ->
               {reply, {error, X}, State}

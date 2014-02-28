@@ -11,8 +11,7 @@ is_registered(_) ->
 
 start() ->
 	ok = teledamus:start(),
-	{connection, Pid} = teledamus:get_connection(),
-	{connection, Pid}.
+  teledamus:get_connection().
 
 stop(Con) ->
 	try
@@ -29,7 +28,7 @@ connection_test_() ->
 	{"The application can connect to Cassandra server and return alive connection process"},
 	{setup, fun start/0, fun stop/1, fun(Connection) ->
 		?_assertMatch({connection, _}, Connection),
-		{connection, Pid} = Connection,
+    #connection{pid = Pid} = Connection,
 		?_assert(is_process_alive(Pid))
   end}.
 
