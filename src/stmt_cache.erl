@@ -27,8 +27,8 @@ init() ->
 %% PreparedStmtId - compiled prepared statement id
 %% @end
 -spec to_cache(list(), binary()) -> true.
-to_cache(Query, PreparedStmtId) ->
-  ets:insert(?STMT_CACHE, {Query, PreparedStmtId}).
+to_cache(Key, PreparedStmtId) ->
+  ets:insert(?STMT_CACHE, {Key, PreparedStmtId}).
 
 %% @doc
 %% Get prepared statement id to cache for given query
@@ -37,8 +37,8 @@ to_cache(Query, PreparedStmtId) ->
 %% Result - compiled prepared statement id or not_found
 %% @end
 -spec from_cache(list()) -> {ok, binary()} | not_found.
-from_cache(Query) ->
-  case ets:lookup(?STMT_CACHE, Query) of
+from_cache(Key) ->
+  case ets:lookup(?STMT_CACHE, Key) of
     [{_, Id}] ->
       {ok, Id};
     [] ->
@@ -55,13 +55,14 @@ from_cache(Query) ->
 %% @end
 -spec cache(list(), connection(), timeout()) -> {ok, binary()} | error.
 cache(Query, Con, Timeout) ->
-  case ets:lookup(?STMT_CACHE, Query) of
+  #connection{host = Host, port = Port} = Con,
+  case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
 		[{_, Id}] ->
 			{ok, Id};
     [] ->
       case connection:prepare_query(Con, Query, Timeout) of
         {PreparedStmtId, _, _} ->
-          ets:insert(?STMT_CACHE, {Query, PreparedStmtId}),
+          ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),
           {ok, PreparedStmtId};
         Err ->
           Err

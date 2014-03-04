@@ -6,7 +6,7 @@
 -export([start/3]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/3, to_cache/4, query/5, prepare_query/4, batch_query/4, handle_frame/2]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2]).
 
 
 -include_lib("native_protocol.hrl").
@@ -47,7 +47,7 @@ prepare_query(Stream = #stream{stream_pid = Pid}, Query, Timeout, UseCache) ->
   R = gen_server:call(Pid, {prepare, Query}, Timeout),
   case {UseCache, R} of
     {true, {Id, _, _}} ->
-      to_cache(Stream, Query, Id, Timeout),
+      to_cache(Stream, Query, Id),
       R;
     {false, _} ->
       R
@@ -78,11 +78,11 @@ batch_query(Stream = #stream{stream_pid = Pid}, Batch = #batch_query{queries = Q
 subscribe_events(#stream{stream_pid = Pid}, EventTypes, Timeout) ->
   gen_server:call(Pid, {register, EventTypes}, Timeout).
 
-from_cache(#stream{stream_pid = Pid}, Query, Timeout) ->
-  gen_server:call(Pid, {from_cache, Query}, Timeout).
+from_cache(#stream{connection = #connection{host = Host, port = Port}}, Query) ->
+  stmt_cache:from_cache({Host, Port, Query}).
 
-to_cache(#stream{stream_pid = Pid}, Query, Id, Timeout) ->
-  gen_server:call(Pid, {to_cache, Query, Id}, Timeout).
+to_cache(#stream{connection = #connection{host = Host, port = Port}}, Query, Id) ->
+  stmt_cache:to_cache({Host, Port, Query}, Id).
 
 
 
@@ -135,12 +135,6 @@ handle_call(Request, From, State = #state{id = StreamId, connection = #connectio
 			Frame = #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
 			connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
       {noreply, State#state{caller = From}};
-
-    {from_cache, Query} ->
-      {reply, stmt_cache:from_cache(Query), State};
-
-    {to_cache, Query, Id} ->
-      {reply, stmt_cache:to_cache(Query, Id), State};
 
     _ ->
       error_logger:error_msg("Unknown request ~p~n", [Request]),

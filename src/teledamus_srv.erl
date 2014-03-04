@@ -3,6 +3,7 @@
 -behaviour(gen_server).
 
 -include_lib("rr.hrl").
+-include_lib("native_protocol.hrl").
 
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
@@ -10,7 +11,6 @@
 
 -type node() :: [{nonempty_string(), pos_integer()}].
 -type transport() :: gen_tcp | ssl.
--type compression() :: none | lz4 | snappy.
 -record(state, {nodes :: rr_state(node()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: transport(), compression = none :: compression()}).
 
 %%%===================================================================
@@ -111,9 +111,10 @@ handle_call(Request, From, State) ->
               case Transport:connect(Host, Port, Opts) of
                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
-                  {ok, Connection} = connection:start(Socket, Credentials, Transport, Compression),
-                  ok = Transport:controlling_process(Socket, Connection),
-                  gen_server:reply(From, {connection, Connection});
+                  {ok, Pid} = connection:start(Socket, Credentials, Transport, Compression, Host, Port),
+                  Connection = #connection{pid = Pid, host = Host, port = Port},
+                  ok = Transport:controlling_process(Socket, Pid),
+                  gen_server:reply(From, Connection);
                 {error, Reason} ->
                   gen_server:reply(From, {error, Reason})
               end
@@ -126,7 +127,8 @@ handle_call(Request, From, State) ->
 			end;
 
 		{release_connection, Connection} ->
-			case is_process_alive(element(2, Connection)) of
+      #connection{pid = Pid} = Connection,
+			case is_process_alive(Pid) of
 				true ->
 					Socket = connection:get_socket(Connection),
 					Transport:close(Socket),

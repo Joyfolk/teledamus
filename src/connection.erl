@@ -7,8 +7,8 @@
 -type socket() :: gen_tcp:socket() | ssl:sslsocket().
 
 %% API
--export([start/4, prepare_ets/0]).
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/1, to_cache/2, query/5, prepare_query/4, batch_query/4,
+-export([start/6, prepare_ets/0]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
          new_stream/2, release_stream/2, send_frame/2]).
 
 %% gen_server callbacks
@@ -37,7 +37,6 @@ release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
 
 options(#connection{pid = Pid}, Timeout) ->
   Stream = get_default_stream(Pid),
-	error_logger:info_msg("Stream=<~p>", [Stream]),
   stream:options(Stream, Timeout).
 
 query(#connection{pid = Pid}, Query, Params, Timeout) ->
@@ -75,11 +74,11 @@ subscribe_events(#connection{pid = Pid}, EventTypes, Timeout) ->
 get_socket(#connection{pid = Pid})->
   gen_server:call(Pid, get_socket).
 
-from_cache(Query) ->
-  stmt_cache:from_cache(Query).
+from_cache(#connection{host = Host, port = Port}, Query) ->
+  stmt_cache:from_cache({Host, Port, Query}).
 
-to_cache(Query, PreparedStmtId) ->
-  stmt_cache:to_cache(Query, PreparedStmtId).
+to_cache(#connection{host = Host, port = Port}, Query, PreparedStmtId) ->
+  stmt_cache:to_cache({Host, Port, Query}, PreparedStmtId).
 
 prepare_ets() ->
 	case ets:info(?DEF_STREAM_ETS) of
@@ -95,8 +94,8 @@ prepare_ets() ->
 %% @spec start() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start(Socket, Credentials, Transport, Compression) ->
-  gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression], []).
+start(Socket, Credentials, Transport, Compression, Host, Port) ->
+  gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port], []).
 
 %%%===================================================================
 %%% gen_server callbacks
