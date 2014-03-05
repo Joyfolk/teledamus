@@ -1,4 +1,3 @@
-
 -define(MAX_BODY_LENGTH, 268435455). %% from spec: currently a frame is limited to 256MB in length
 -define(MAX_SHORT_LENGTH, 65535).
 -define(MAX_LONG_LENGTH, 2147483647).

@@ -1,9 +1,0 @@
-{application, exampes,
- [
-  {description, "Teledamus Examples"},
-  {vsn, "0.1.2"},
-	{registered, []},
-	{applications, [kernel, stdlib, teledamus]},
-	{env, [	 ]}
- ]
-}.

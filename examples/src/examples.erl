@@ -1,6 +1,6 @@
 -module(examples).
 
--export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2,
+-export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/0,
          load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
@@ -16,6 +16,7 @@ create_schema() ->
   teledamus:query(Con, "CREATE KEYSPACE IF NOT EXISTS examples WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"),
   {keyspace, "examples"} = teledamus:query(Con, "USE examples"),
   {created, "examples", "profiles"} = teledamus:query(Con, "CREATE TABLE IF NOT EXISTS profiles(s_id varchar, c_id varchar, v_id varchar, o_id varchar, PRIMARY KEY(s_id)) WITH caching = 'all' AND compaction =  { 'class' : 'SizeTieredCompactionStrategy' } AND compression = { 'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : 32, 'crc_check_chance' : 0.5}" ),
+  {created, "examples", "counters"} = teledamus:query(Con, "CREATE TABLE IF NOT EXISTS counters(c1 counter, c2 counter, id1 varchar, id2 varchar, PRIMARY KEY(id1, id2))"),
   teledamus:release_connection(Con),
   ok.
 
@@ -24,6 +25,13 @@ drop_schema() ->
   {dropped, "examples", []} = teledamus:query(Con, "DROP KEYSPACE examples"),
   teledamus:release_connection(Con),
   ok.
+
+counters_test() ->
+  Con = teledamus:get_connection(),
+  teledamus:query(Con, "USE examples"),
+  R = teledamus:query(Con, "UPDATE counters SET c1 = c1 + 1 WHERE id1 = '123' AND id2 = 'ABC'"),
+  teledamus:release_connection(Con),
+  R.
 
 load_test(Count) ->
   load_test(Count, undefined).
