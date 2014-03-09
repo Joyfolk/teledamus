@@ -9,7 +9,7 @@
 %% API
 -export([start/6, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
-         new_stream/2, release_stream/2, send_frame/2]).
+         new_stream/2, release_stream/2, send_frame/2, get_default_stream/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -35,40 +35,31 @@ release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
 
-options(#connection{pid = Pid}, Timeout) ->
-  Stream = get_default_stream(Pid),
+options(#connection{default_stream = Stream}, Timeout) ->
   stream:options(Stream, Timeout).
 
-query(#connection{pid = Pid}, Query, Params, Timeout) ->
-	Stream = get_default_stream(Pid),
+query(#connection{default_stream = Stream}, Query, Params, Timeout) ->
 	stream:query(Stream, Query, Params, Timeout).
 
-query(#connection{pid = Pid}, Query, Params, Timeout, UseCache) ->
-	Stream = get_default_stream(Pid),
+query(#connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
 	stream:query(Stream, Query, Params, Timeout, UseCache).
 
-prepare_query(#connection{pid = Pid}, Query, Timeout) ->
-	Stream = get_default_stream(Pid),
-  stream:prepare_query(Stream, Query, Timeout).
+prepare_query(#connection{default_stream = Stream}, Query, Timeout) ->
+	stream:prepare_query(Stream, Query, Timeout).
 
-prepare_query(#connection{pid = Pid}, Query, Timeout, UseCache) ->
-	Stream = get_default_stream(Pid),
+prepare_query(#connection{default_stream = Stream}, Query, Timeout, UseCache) ->
 	stream:prepare_query(Stream, Query, Timeout, UseCache).
 
-execute_query(#connection{pid = Pid}, ID, Params, Timeout) ->
-	Stream = get_default_stream(Pid),
+execute_query(#connection{default_stream = Stream}, ID, Params, Timeout) ->
   stream:execute_query(Stream, ID, Params, Timeout).
 
-batch_query(#connection{pid = Pid}, Batch, Timeout) ->
-	Stream = get_default_stream(Pid),
+batch_query(#connection{default_stream = Stream}, Batch, Timeout) ->
   stream:batch_query(Stream, Batch, Timeout).
 
-batch_query(#connection{pid = Pid}, Batch, Timeout, UseCache) ->
-	Stream = get_default_stream(Pid),
+batch_query(#connection{default_stream = Stream}, Batch, Timeout, UseCache) ->
 	stream:batch_query(Stream, Batch, Timeout, UseCache).
 
-subscribe_events(#connection{pid = Pid}, EventTypes, Timeout) ->
-	Stream = get_default_stream(Pid),
+subscribe_events(#connection{default_stream = Stream}, EventTypes, Timeout) ->
 	stream:subscribe_events(Stream, EventTypes, Timeout).
 
 get_socket(#connection{pid = Pid})->
@@ -134,15 +125,6 @@ init([Socket, Credentials, Transport, Compression, Host, Port]) ->
   end,
   RR.
 
-%% update_state(StreamId, From, State) ->
-%%   if
-%%     is_integer(StreamId) andalso StreamId > 0 ->
-%%       {noreply, State}.
-%% ;
-%%     true ->
-%%       {noreply, State#state{caller = From}}
-%%   end.
-
 
 %%--------------------------------------------------------------------
 %% @private
@@ -154,6 +136,14 @@ init([Socket, Credentials, Transport, Compression, Host, Port]) ->
 %%--------------------------------------------------------------------
 handle_call(Request, _From, State = #state{socket = Socket, transport = _Transport, compression = Compression, streams = Streams, host = Host, port = Port}) ->
   case Request of
+		{get_stream, Id} ->
+			case dict:find(Id, Streams) of
+				{ok, [Stream]} ->
+					{reply, Stream, State};
+				_ ->
+					{reply, {error, {stream_not_found, Id}}, State}
+			end;
+
     new_stream ->
       case find_next_stream_id(Streams) of
         no_streams_available ->
@@ -260,7 +250,8 @@ handle_info({inet_reply, _, Status}, State) ->
 
 handle_info({'Down', From, Reason}, State) ->  %% todo
 	error_logger:error_msg("Child killed ~p: ~p, state=~p", [From, Reason, State]),
-	case From =:= get_default_stream(self()) of
+	#stream{stream_pid = Pid} = dict:fetch(?DEFAULT_STREAM_ID, State#state.streams),
+	case From =:= Pid of
 		true -> {stop, {default_stream_death, Reason}, State};
 		_ -> {noreply, State}
 	end;
@@ -421,6 +412,5 @@ find_next_stream_id(Id, Streams) ->
       find_next_stream_id(Id + 1, Streams)
   end.
 
-get_default_stream(Pid) ->
-	[{_, Stream}] = ets:lookup(?DEF_STREAM_ETS, Pid),
-	Stream.
+get_default_stream(#connection{pid = Pid}) ->
+	gen_server:call(Pid, {get_stream, ?DEFAULT_STREAM_ID}).

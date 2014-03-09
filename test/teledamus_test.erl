@@ -11,7 +11,9 @@ is_registered(_) ->
 
 start() ->
 	ok = teledamus:start(),
-  teledamus:get_connection().
+  Con = teledamus:get_connection(),
+	#connection{} = Con,
+  Con.
 
 stop(Con) ->
 	try

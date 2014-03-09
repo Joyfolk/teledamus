@@ -112,7 +112,8 @@ handle_call(Request, From, State) ->
                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
                   {ok, Pid} = connection:start(Socket, Credentials, Transport, Compression, Host, Port),
-                  Connection = #connection{pid = Pid, host = Host, port = Port},
+									DefStream = connection:get_default_stream(#connection{pid = Pid}),
+                  Connection = #connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
                   ok = Transport:controlling_process(Socket, Pid),
                   gen_server:reply(From, Connection);
                 {error, Reason} ->
@@ -120,7 +121,8 @@ handle_call(Request, From, State) ->
               end
             catch
               E:EE ->
-                gen_server:reply(From, {error, {E, EE}})
+								error_logger:error_msg("Connection error: ~p:~p, trace=~p", [E, EE, erlang:get_stacktrace()]),
+								gen_server:reply(From, {error, {E, EE, erlang:get_stacktrace()}})
             end
           end),
           {noreply, State#state{nodes = NS}}

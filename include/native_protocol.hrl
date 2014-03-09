@@ -122,7 +122,7 @@
 -type batch_query() :: #batch_query{}.
 
 
--record(connection, {pid :: pid(), host :: list(), port :: pos_integer()}).
+-record(connection, {pid :: pid(), host :: list(), port :: pos_integer(), default_stream :: stream()}).
 -record(stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
 
 -type error() :: #error{}.
