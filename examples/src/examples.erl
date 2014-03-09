@@ -1,6 +1,6 @@
 -module(examples).
 
--export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/0,
+-export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/1, counters_test/2,
          load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
@@ -26,12 +26,44 @@ drop_schema() ->
   teledamus:release_connection(Con),
   ok.
 
-counters_test() ->
+counters_test(M, N) ->
+  Cons = lists:map(fun(_) ->
+    Con = teledamus:get_connection(),
+    {Q, _, _} = teledamus:prepare_query(Con, "UPDATE examples.counters SET c1 = c1 + 1 WHERE id1 = '123' AND id2 = 'ABC'"),
+    {Con, Q}
+  end, lists:seq(1, M)),
+  Parent = self(),
+  T0 = millis(),
+  lists:foreach(fun({Con, Q}) -> spawn(fun() -> R = counter_test_int(Con, Q, N) / N, Parent ! R end) end, Cons),
+  R = wait_for_N(M),
+  T1 = millis(),
+  lists:foreach(fun({C, _}) -> teledamus:release_connection(C) end, Cons),
+  {(M*N) / (T1-T0) * 1000, R}.
+
+counters_test(N) ->
   Con = teledamus:get_connection(),
   teledamus:query(Con, "USE examples"),
-  R = teledamus:query(Con, "UPDATE counters SET c1 = c1 + 1 WHERE id1 = '123' AND id2 = 'ABC'"),
+  {Q, _, _} = teledamus:prepare_query(Con, "UPDATE counters SET c1 = c1 + 1 WHERE id1 = '123' AND id2 = 'ABC'"),
+  T0 = millis(),
+  counter_test_int(Con, Q, N),
+  T1 = millis(),
   teledamus:release_connection(Con),
-  R.
+  N / (T1-T0) * 1000.
+
+counter_test_int(_, _, 0) ->
+  0;
+counter_test_int(Con, Q, N) ->
+  T0 = millis(),
+  R = try
+    teledamus:execute_query(Con, Q, #query_params{consistency_level = one}, 1000),
+    millis()
+  catch
+    E: EE ->
+      T1 = millis(),
+      error_logger:error_msg("~p: Exception ~p:~p, stack=~p", [self(), E, EE, erlang:get_stacktrace()]),
+      T1
+  end - T0,
+  R + counter_test_int(Con, Q, N - 1).
 
 load_test(Count) ->
   load_test(Count, undefined).
