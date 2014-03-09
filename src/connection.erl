@@ -194,7 +194,12 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
 handle_cast(Request, State = #state{transport = Transport, socket = Socket}) ->
 	case Request of
 		{send_frame, Frame} ->
-			Transport:send(Socket, Frame),
+			case Transport of
+				gen_tcp ->
+				  erlang:port_command(Socket, Frame);
+			  _ ->
+					Transport:send(Socket, Frame)
+			end,
 			{noreply, State};
 
 		_ ->
@@ -245,6 +250,13 @@ handle_info({tcp_error, _Socket, Reason}, State) ->
 handle_info({ssl_error, _Socket, Reason}, State) ->
   error_logger:error_msg("SSL error [~p]~n", [Reason]),
   {stop, {tcp_error, Reason}, State};
+
+handle_info({inet_reply, _Socket, ok}, State) ->
+	{noreply, State};
+
+handle_info({inet_reply, _, Status}, State) ->
+	error_logger:error_msg("Socket error [~p]~n", [Status]),
+	{noreply, State};
 
 handle_info({'Down', From, Reason}, State) ->  %% todo
 	error_logger:error_msg("Child killed ~p: ~p, state=~p", [From, Reason, State]),

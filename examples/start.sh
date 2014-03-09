@@ -1,2 +1,2 @@
 rebar compile
-erl -pa ebin edit deps/*/ebin -sname teledamus_examples -s examples
+erl -pa ebin edit deps/*/ebin -config examples.config -sname teledamus_examples -s examples 
