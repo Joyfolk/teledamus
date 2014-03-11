@@ -315,7 +315,7 @@ handle_frame(Frame = #frame{header = Header}, State = #state{streams = Streams})
 			[Stream] = dict:fetch(StreamId, Streams),
 			stream:handle_frame(Stream#stream.stream_pid, Frame);
 		false ->
-			Stream = get_default_stream(self()),
+			Stream = get_default_stream(#connection{pid = self()}),
 			stream:handle_frame(Stream#stream.stream_pid, Frame)
 	end,
 	{noreply, State}.
