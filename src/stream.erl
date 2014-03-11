@@ -6,7 +6,7 @@
 -export([start/3]).
 
 %% -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/3]).
 
 
 -include_lib("native_protocol.hrl").
@@ -20,8 +20,7 @@
 
 -spec(start(connection(), pos_integer(), compression()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start(Connection, StreamId, Compression) ->
-%%   gen_server:start(?MODULE, [Connection, StreamId, Compression], []).
-	proc_lib:start(?MODULE, init, [self(), Connection, StreamId, Compression]).
+	proc_lib:start(?MODULE, init, [Connection, StreamId, Compression]).
 
 options(Stream, Timeout) ->
   call(Stream, options, Timeout).
@@ -89,8 +88,8 @@ to_cache(#stream{connection = #connection{host = Host, port = Port}}, Query, Id)
 
 
 %% -spec(init(Args :: term()) -> {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} | {stop, Reason :: term()} | ignore).
-init(Parent, Connection, StreamId, Compression) ->
-	proc_lib:init_ack(Parent, {ok, self()}),
+init(Connection, StreamId, Compression) ->
+	proc_lib:init_ack({ok, self()}),
 	process_flag(trap_exit, true),
   loop(#state{connection = Connection, id = StreamId, compression = Compression}).
 
