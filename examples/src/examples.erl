@@ -1,6 +1,6 @@
 -module(examples).
 
--export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/1, counters_test/2,
+-export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/1, counters_test/2, counters_test_stream/2,
          load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
@@ -39,6 +39,20 @@ counters_test(M, N) ->
   T1 = millis(),
   lists:foreach(fun({C, _}) -> teledamus:release_connection(C) end, Cons),
   {(M*N) / (T1-T0) * 1000, R}.
+
+counters_test_stream(M, N) ->
+  Con = teledamus:get_connection(),
+  {Q, _, _} = teledamus:prepare_query(Con, "UPDATE examples.counters SET c1 = c1 + 1 WHERE id1 = '123' AND id2 = 'ABC'"),
+  Streams = lists:map(fun(_) -> {teledamus:new_stream(Con), Q} end, lists:seq(1, M)),
+  Parent = self(),
+  T0 = millis(),
+  lists:foreach(fun({Stream, QQ}) -> spawn(fun() -> R = counter_test_int(Stream, QQ, N) / N, Parent ! R end) end, Streams),
+  R = wait_for_N(M),
+  T1 = millis(),
+  lists:foreach(fun({Stream, _}) -> teledamus:release_stream(Stream) end, Streams),
+  teledamus:release_connection(Con),
+  {(M*N) / (T1-T0) * 1000, R}.
+
 
 counters_test(N) ->
   Con = teledamus:get_connection(),
