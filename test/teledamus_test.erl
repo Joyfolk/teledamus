@@ -425,7 +425,7 @@ list_datatype_test_() ->
   end}.
 
 set_datatype_test_() ->
-  {"list datatype test"},
+  {"set datatype test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
     teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #query_params{}, 3000),
     teledamus:query(Connection, "USE test", #query_params{}, 3000),
@@ -442,7 +442,7 @@ set_datatype_test_() ->
 
 
 map_datatype_test_() ->
-  {"list datatype test"},
+  {"map datatype test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
     teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #query_params{}, 3000),
     teledamus:query(Connection, "USE test", #query_params{}, 3000),
@@ -459,7 +459,7 @@ map_datatype_test_() ->
 
 
 cassandra_events_test_() ->
-	{"list datatype test"},
+	{"events handler test"},
 	{setup, fun start/0, fun stop/1, fun(Connection) ->
 		{ok, _Pid} = test_event_handler:start_link(),
 		ok = teledamus:subscribe_events(Connection, [schema_change, status_change, topology_change], 3000),
@@ -475,3 +475,32 @@ cassandra_events_test_() ->
 	end}.
 
 
+cached_query_connection_test_() ->
+  {"Cached query connection test"},
+  {setup, fun start/0, fun stop/1, fun(Connection) ->
+    A = teledamus:query(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000, true),
+    {Meta, Paging, Rows} = A,
+    [?_assertMatch({_, _, _}, A),
+      ?_assertEqual(Paging, undefined),
+      ?_assert(is_list(Meta)),
+      ?_assert(is_list(Rows)),
+      ?_assert(length(Rows) > 0),
+      ?_assert(is_list(hd(Rows))),
+      ?_assertEqual(length(Meta), length(hd(Rows)))]
+  end}.
+
+cached_query_stream_test_() ->
+  {"Cached query stream test"},
+  {setup, fun start/0, fun stop/1, fun(Connection) ->
+    Stream = connection:new_stream(Connection, 1000),
+    A = teledamus:query(Stream, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000, true),
+    {Meta, Paging, Rows} = A,
+    connection:release_stream(Stream, 1000),
+    [?_assertMatch({_, _, _}, A),
+      ?_assertEqual(Paging, undefined),
+      ?_assert(is_list(Meta)),
+      ?_assert(is_list(Rows)),
+      ?_assert(length(Rows) > 0),
+      ?_assert(is_list(hd(Rows))),
+      ?_assertEqual(length(Meta), length(hd(Rows)))]
+  end}.

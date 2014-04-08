@@ -208,18 +208,6 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
 	end.
 
 
-%% -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
-%% terminate(_Reason, #state{caller = Id, connection = #connection{pid = Pid}}) ->
-%% 	case is_process_alive(Pid) of
-%% 		true ->	connection:release_stream(#stream{connection = #connection{pid = Pid}, stream_id = Id, stream_pid = self()}, 1000), ok;
-%% 		_ -> ok
-%% 	end.
-%%
-%% -spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{}, Extra :: term()) -> {ok, NewState :: #state{}} | {error, Reason :: term()}).
-%% code_change(_OldVsn, State, _Extra) ->
-%%   {ok, State}.
-%%
-
 start_gen_event_if_required() ->
 	case whereis(cassandra_events) of
 		undefined ->

@@ -112,8 +112,9 @@ init([Socket, Credentials, Transport, Compression, Host, Port]) ->
 				{ok, StreamId} = stream:start(Connection, ?DEFAULT_STREAM_ID, Compression),
 				monitor(process, StreamId),
 				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
+        DefStream2 = DefStream#stream{connection = Connection#connection{default_stream = DefStream}},
 				ets:insert(?DEF_STREAM_ETS, {self(), DefStream}),
-        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:append(?DEFAULT_STREAM_ID, DefStream, dict:new())}}
+        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:append(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
 		  catch
 				E: EE ->
 				  {stop, {error, E, EE}}
