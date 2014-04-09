@@ -1,7 +1,7 @@
 {application, teledamus,
  [
   {description, "Erlang client library for Apache Cassandra"},
-  {vsn, "0.3.1"},
+  {vsn, "0.3.2"},
 
 	{registered, []},
 	{applications, [kernel, stdlib]},

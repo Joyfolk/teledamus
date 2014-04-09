@@ -113,8 +113,8 @@ init([Socket, Credentials, Transport, Compression, Host, Port]) ->
 				monitor(process, StreamId),
 				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
         DefStream2 = DefStream#stream{connection = Connection#connection{default_stream = DefStream}},
-				ets:insert(?DEF_STREAM_ETS, {self(), DefStream}),
-        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:append(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
+				ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
+        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
 		  catch
 				E: EE ->
 				  {stop, {error, E, EE}}
@@ -139,7 +139,7 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
   case Request of
 		{get_stream, Id} ->
 			case dict:find(Id, Streams) of
-				{ok, [Stream]} ->
+				{ok, Stream} ->
 					{reply, Stream, State};
 				_ ->
 					{reply, {error, {stream_not_found, Id}}, State}
@@ -150,11 +150,12 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
         no_streams_available ->
           {reply, {error, no_streams_available}, State};
         StreamId ->
-          Connection = #connection{pid = self(), host = Host, port = Port},
+          DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
+          Connection = #connection{pid = self(), host = Host, port = Port, default_stream = DefStream},
           case stream:start(Connection, StreamId, Compression) of
             {ok, StreamPid} ->
               Stream = #stream{connection = Connection, stream_pid = StreamPid, stream_id = StreamId},
-              {reply, Stream, State#state{streams = dict:append(StreamId, Stream, Streams)}};
+              {reply, Stream, State#state{streams = dict:store(StreamId, Stream, Streams)}};
             {error, X} ->
               {reply, {error, X}, State}
           end
@@ -313,7 +314,7 @@ handle_frame(Frame = #frame{header = Header}, State = #state{streams = Streams})
 	StreamId = Header#header.stream,
 	case dict:is_key(StreamId, Streams) of
 		true ->
-			[Stream] = dict:fetch(StreamId, Streams),
+			Stream = dict:fetch(StreamId, Streams),
 			stream:handle_frame(Stream#stream.stream_pid, Frame);
 		false ->
 			Stream = get_default_stream(#connection{pid = self()}),
@@ -414,4 +415,4 @@ find_next_stream_id(Id, Streams) ->
   end.
 
 get_default_stream(#connection{pid = Pid}) ->
-	gen_server:call(Pid, {get_stream, ?DEFAULT_STREAM_ID}).
+	#stream{} = gen_server:call(Pid, {get_stream, ?DEFAULT_STREAM_ID}).
