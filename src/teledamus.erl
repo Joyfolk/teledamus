@@ -55,7 +55,7 @@ get_connection(Timeout) ->
 %%% Connection - connection to DB, as returned from get_connection()
 %%% @end
 -spec release_connection(connection()) -> 'ok'.
-release_connection(Connection) ->
+release_connection(Connection = #connection{}) ->
   teledamus_srv:release_connection(Connection, ?DEFAULT_TIMEOUT).
 
 %%% @doc
@@ -66,7 +66,7 @@ release_connection(Connection) ->
 %%% Connection - connection to DB, as returned from get_connection()
 %%% @end
 -spec release_connection(connection(), timeout()) -> 'ok'.
-release_connection(Connection, Timeout) ->
+release_connection(Connection = #connection{}, Timeout) ->
   teledamus_srv:release_connection(Connection, Timeout).
 
 
@@ -77,7 +77,7 @@ release_connection(Connection, Timeout) ->
 %%% Result - stream | {error, Reason}
 %%% @end
 -spec new_stream(connection()) -> stream() | {error, any()}.
-new_stream(Connection) ->
+new_stream(Connection = #connection{}) ->
   connection:new_stream(Connection, ?DEFAULT_TIMEOUT).
 
 %%% @doc
@@ -88,7 +88,7 @@ new_stream(Connection) ->
 %%% Result - stream | {error, Reason}
 %%% @end
 -spec new_stream(connection(), timeout()) -> stream() | {error, any()}.
-new_stream(Connection, Timeout) ->
+new_stream(Connection = #connection{}, Timeout) ->
   connection:new_stream(Connection, Timeout).
 
 
