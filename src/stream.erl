@@ -181,7 +181,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
 				?OPC_ERROR ->
 					Error = native_parser:parse_error(Frame),
 					error_logger:error_msg("CQL error ~p~n", [Error]),
-					reply_if_needed(Caller, Error),
+					reply_if_needed(Caller, {error, Error}),
 					{noreply, State#state{caller = undefined}};
 				?OPC_READY ->
 					reply_if_needed(Caller, ok),
