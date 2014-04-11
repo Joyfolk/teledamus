@@ -116,7 +116,7 @@ reply_if_needed(Caller, Reply) ->
     undefined ->
       ok;
     _ ->
-      Caller ! Reply
+      Caller ! {reply, Reply}
   end.
 
 
@@ -220,7 +220,7 @@ start_gen_event_if_required() ->
 call(#stream{stream_pid = Pid}, Msg, Timeout) ->
   Pid ! {call, self(), Msg},
   receive
-    X -> X
+    {reply, X} -> X
   after
     Timeout -> {error, timeout}
   end.
