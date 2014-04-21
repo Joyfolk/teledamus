@@ -79,8 +79,17 @@ compress_if_needed(Frame, Compression) ->
 	end.
 
 parse_frame(<<Header:4/binary, Length:32/big-unsigned-integer, Body:Length/binary, Rest/binary>>, Compression) ->
-	F = #frame{header = parse_frame_header(Header), length = Length, body = Body},
-	{decompress_if_needed(F, Compression), Rest};
+  H = parse_frame_header(Header),
+	F = #frame{header = H, length = Length, body = Body},
+  #flags{tracing = IsTracing} = H#header.flags,
+  case IsTracing of
+    true ->
+      {TracingId, Body2} = parse_uuid(decompress_if_needed(F, Compression)),
+      error_logger:info_msg("TracingId = ~p", [TracingId]),
+      {F#frame{body = Body2}, Rest};
+    false ->
+      {decompress_if_needed(F, Compression), Rest}
+  end;
 parse_frame(<<Rest/binary>>, _Compressing) ->
 	{undefined, Rest}.
 
