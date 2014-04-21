@@ -64,7 +64,7 @@ cache(Query, Con, Timeout) ->
         {PreparedStmtId, _, _} ->
           ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),
           {ok, PreparedStmtId};
-        Err ->
+        Err = #error{} ->
           Err
       end
   end.
