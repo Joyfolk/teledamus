@@ -33,7 +33,7 @@ query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
     true ->
       case stmt_cache:cache(Query, Con, Timeout) of
         {ok, Id} -> call(Stream, {execute, Id, Params}, Timeout);
-        Err -> Err
+        Err = #error{} -> Err
       end;
     false ->
       call(Stream, {query, Query, Params}, Timeout)
@@ -59,15 +59,19 @@ execute_query(Stream, ID, Params, Timeout) ->
 batch_query(Stream, Batch, Timeout) ->
   call(Stream, {batch, Batch}, Timeout).
 
-batch_query(Stream, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
+batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
   case UseCache of
     true ->
       NBatch = Batch#batch_query{queries = lists:map(
         fun({Id, Args}) when is_binary(Id) ->
-          {Id, Args};
+             {Id, Args};
           ({Query, Args}) when is_list(Query) ->
-            {Id, _, _} = prepare_query(Stream, Query, Timeout, true),
-            {Id, Args}
+            case stmt_cache:cache(Query, Con, Timeout) of
+              {ok, Id} ->
+                {Id, Args};
+              Err ->
+                throw({caching_error, Err})
+            end
         end, Queries)},
       call(Stream, {batch, NBatch}, Timeout);
 
