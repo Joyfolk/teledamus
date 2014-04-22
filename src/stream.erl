@@ -12,7 +12,7 @@
 -include_lib("native_protocol.hrl").
 
 
--record(state, {connection :: connection(), id :: 1..127, caller :: pid(), compression = none :: compression()}).
+-record(state, {connection :: connection(), id :: 1..127, caller :: {pid(), any()}, compression = none :: compression()}).
 
 %%%===================================================================
 %%% API
@@ -119,8 +119,8 @@ reply_if_needed(Caller, Reply) ->
   case Caller of
     undefined ->
       ok;
-    _ ->
-      Caller ! {reply, Reply}
+    {Pid, _} ->
+      erlang:send(Pid, {reply, Caller, Reply}, [noconnect])
   end.
 
 
@@ -222,9 +222,18 @@ start_gen_event_if_required() ->
 
 
 call(#stream{stream_pid = Pid}, Msg, Timeout) ->
-  Pid ! {call, self(), Msg},
-  receive
-    {reply, X} -> X
-  after
-    Timeout -> {error, timeout}
+  try erlang:monitor(process, Pid) of
+    Mref ->
+      Tag = {self(), Mref},
+      erlang:send(Pid, {call, Tag, Msg}, [noconnect]),
+      receive
+        {reply, Tag, X} ->
+          erlang:demonitor(Mref, [flush]),
+          X
+      after
+        Timeout -> {error, timeout}
+      end
+  catch
+    error: Reason ->
+      {error, Reason}
   end.
