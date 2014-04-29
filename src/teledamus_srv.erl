@@ -9,9 +9,9 @@
 
 -define(SERVER, ?MODULE).
 
--type node() :: [{nonempty_string(), pos_integer()}].
+-type cnode() :: [{nonempty_string(), pos_integer()}].
 -type transport() :: gen_tcp | ssl.
--record(state, {nodes :: rr_state(node()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: transport(), compression = none :: compression()}).
+-record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: transport(), compression = none :: compression()}).
 
 %%%===================================================================
 %%% API
