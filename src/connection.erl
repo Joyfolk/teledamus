@@ -11,6 +11,8 @@
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
          new_stream/2, release_stream/2, send_frame/2, get_default_stream/1]).
 
+-export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
@@ -25,52 +27,103 @@
 %%% API
 %%%===================================================================
 
+-spec send_frame(pid(), binary()) -> ok | {error, Reason :: term()}.
 send_frame(Pid, Frame) ->
 	gen_server:cast(Pid, {send_frame, Frame}).
 
+-spec new_stream(connection(), timeout()) -> stream() | error().
 new_stream(#connection{pid = Pid}, Timeout) ->
   gen_server:call(Pid, new_stream, Timeout).
 
+-spec release_stream(stream(), timeout()) -> ok | error().
 release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
-
+-spec options(Connection :: connection(), Timeout :: timeout()) ->  timeout | error() | options().
 options(#connection{default_stream = Stream}, Timeout) ->
   stream:options(Stream, Timeout).
 
+-spec options_async(Connection :: connection(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+options_async(#connection{default_stream = Stream}, Timeout) ->
+	stream:options_async(Stream, Timeout).
+
+-spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(#connection{default_stream = Stream}, Query, Params, Timeout) ->
 	stream:query(Stream, Query, Params, Timeout).
 
+-spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+query_async(#connection{default_stream = Stream}, Query, Params, ReplyTo) ->
+	stream:query_async(Stream, Query, Params, ReplyTo).
+
+-spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error() | result_rows() | schema_change().
 query(#connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
 	stream:query(Stream, Query, Params, Timeout, UseCache).
 
+-spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+query_async(#connection{default_stream = Stream}, Query, Params, ReplyTo, UseCache) ->
+	stream:query_async(Stream, Query, Params, ReplyTo, UseCache).
+
+-spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(#connection{default_stream = Stream}, Query, Timeout) ->
 	stream:prepare_query(Stream, Query, Timeout).
 
+-spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+prepare_query_async(#connection{default_stream = Stream}, Query, ReplyTo) ->
+	stream:prepare_query_async(Stream, Query, ReplyTo).
+
+-spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(#connection{default_stream = Stream}, Query, Timeout, UseCache) ->
 	stream:prepare_query(Stream, Query, Timeout, UseCache).
 
+-spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+prepare_query_async(#connection{default_stream = Stream}, Query, ReplyTo, UseCache) ->
+	stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
+
+-spec execute_query(Con :: connection(), ID :: binary(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(#connection{default_stream = Stream}, ID, Params, Timeout) ->
   stream:execute_query(Stream, ID, Params, Timeout).
 
+-spec execute_query_async(Con :: connection(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+execute_query_async(#connection{default_stream = Stream}, ID, Params, ReplyTo) ->
+	stream:execute_query_async(Stream, ID, Params, ReplyTo).
+
+-spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout()) -> timeout | ok | error().
 batch_query(#connection{default_stream = Stream}, Batch, Timeout) ->
   stream:batch_query(Stream, Batch, Timeout).
 
+-spec batch_query(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+batch_query_async(#connection{default_stream = Stream}, Batch, ReplyTo) ->
+	stream:batch_query_async(Stream, Batch, ReplyTo).
+
+-spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error().
 batch_query(#connection{default_stream = Stream}, Batch, Timeout, UseCache) ->
 	stream:batch_query(Stream, Batch, Timeout, UseCache).
 
+-spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+batch_query_async(#connection{default_stream = Stream}, Batch, ReplyTo, UseCache) ->
+	stream:batch_query_async(Stream, Batch, ReplyTo, UseCache).
+
+-spec subscribe_events(Con :: connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | error().
 subscribe_events(#connection{default_stream = Stream}, EventTypes, Timeout) ->
 	stream:subscribe_events(Stream, EventTypes, Timeout).
 
+-spec subscribe_events_async(Con :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | timeout | {error, Reason :: term()}.
+subscribe_events_async(#connection{default_stream = Stream}, EventTypes, ReplyTo) ->
+	stream:subscribe_events_async(Stream, EventTypes, ReplyTo).
+
+-spec get_socket(Con :: connection()) -> socket() | {error, Reason :: term()}.
 get_socket(#connection{pid = Pid})->
   gen_server:call(Pid, get_socket).
 
+-spec from_cache(Con :: connection(), Query :: string()) -> {ok, binary()} | not_found.
 from_cache(#connection{host = Host, port = Port}, Query) ->
   stmt_cache:from_cache({Host, Port, Query}).
 
+-spec to_cache(Con :: connection(), Query :: string(), PreparedStmtId :: binary()) -> true.
 to_cache(#connection{host = Host, port = Port}, Query, PreparedStmtId) ->
   stmt_cache:to_cache({Host, Port, Query}, PreparedStmtId).
 
+-spec prepare_ets() -> default_streams.
 prepare_ets() ->
 	case ets:info(?DEF_STREAM_ETS) of
 		undefined -> ets:new(?DEF_STREAM_ETS, [named_table, set, public, {write_concurrency, false}, {read_concurrency, true}]);

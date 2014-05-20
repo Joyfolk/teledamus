@@ -7,7 +7,7 @@
 
 %% -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/3]).
-
+-export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
 -include_lib("native_protocol.hrl").
 
@@ -22,12 +22,23 @@
 start(Connection, StreamId, Compression) ->
 	proc_lib:start(?MODULE, init, [Connection, StreamId, Compression]).
 
+-spec options(Stream :: stream(), Timeout :: timeout()) ->  timeout | error() | options().
 options(Stream, Timeout) ->
   call(Stream, options, Timeout).
 
+-spec options_async(Stream :: stream(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+options_async(Stream, ReplyTo) ->
+	cast(Stream, options, ReplyTo).
+
+-spec query(Stream :: stream(), Query :: string(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream, Query, Params, Timeout) ->
   call(Stream, {query, Query, Params}, Timeout).
 
+-spec query_async(Stream :: stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+query_async(Stream, Query, Params, ReplyTo) ->
+	cast(Stream, {query, Query, Params}, ReplyTo).
+
+-spec query(Stream :: stream(), Query :: string(), Params :: query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
   case UseCache of
     true ->
@@ -39,10 +50,30 @@ query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
       call(Stream, {query, Query, Params}, Timeout)
   end.
 
+-spec query_async(Stream :: stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+query_async(Stream = #stream{connection = Con}, Query, Params, ReplyTo, UseCache) ->
+	case UseCache of
+		true ->
+			stmt_cache:cache_async(Query, Con, fun(Res) ->
+	       case Res of
+				  {ok, Id} -> cast(Stream, {execute, Id, Params}, ReplyTo);
+				  Err = #error{} -> Err
+        end
+			end);
+		false ->
+			cast(Stream, {query, Query, Params}, ReplyTo)
+	end.
 
+
+-spec prepare_query(Stream :: stream(), Query :: string(), Timeout :: timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream, Query, Timeout) ->
   prepare_query(Stream, Query, Timeout, false).
 
+-spec prepare_query_async(Stream :: stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+prepare_query_async(Stream, Query, Timeout) ->
+	prepare_query(Stream, Query, Timeout, false).
+
+-spec prepare_query(Stream :: stream(), Query :: string(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream, Query, Timeout, UseCache) ->
   R = call(Stream, {prepare, Query}, Timeout),
   case {UseCache, R} of
@@ -53,12 +84,36 @@ prepare_query(Stream, Query, Timeout, UseCache) ->
       R
   end.
 
+-spec prepare_query_async(Stream :: stream(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+prepare_query_async(Stream, Query, ReplyTo, UseCache) ->
+	cast(Stream, {prepare, Query}, fun(R) ->
+		case {UseCache, R} of
+			{true, {Id, _, _}} ->
+				to_cache(Stream, Query, Id),
+				reply_if_needed(ReplyTo, R);
+			{false, _} ->
+				reply_if_needed(ReplyTo, R)
+		end
+	end).
+
+-spec execute_query(Stream :: stream(), ID :: binary(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Stream, ID, Params, Timeout) ->
   call(Stream, {execute, ID, Params}, Timeout).
 
+-spec execute_query(Stream :: stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+execute_query_async(Stream, ID, Params, ReplyTo) ->
+	cast(Stream, {execute, ID, Params}, ReplyTo).
+
+
+-spec batch_query(Stream :: stream(), Batch :: batch_query(), Timeout :: timeout()) -> timeout | ok | error().
 batch_query(Stream, Batch, Timeout) ->
   call(Stream, {batch, Batch}, Timeout).
 
+-spec batch_query_async(Stream :: stream(), Batch :: batch_query(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+batch_query_async(Stream, Batch, ReplyTo) ->
+	cast(Stream, {batch, Batch}, ReplyTo).
+
+-spec batch_query(Stream :: stream(), Batch :: batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error().
 batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
   case UseCache of
     true ->
@@ -79,8 +134,28 @@ batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Q
       call(Stream, {batch, Batch}, Timeout)
   end.
 
+-spec batch_query_async(Stream :: stream(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> timeout | ok.
+batch_query_async(Stream, Batch, ReplyTo, false) ->
+	batch_query_async(Stream, Batch, ReplyTo);
+batch_query_async(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, ReplyTo, true) ->
+	ToCache = lists:filter(fun({Q, _Args}) -> is_list(Q) end, Queries),
+	stmt_cache:cache_async_multple(ToCache, Con, fun(Dict) ->
+		Qs = lists:map(fun({Q, Arg}) ->
+			if
+				is_binary(Q) -> {Q, Arg};
+				true -> {dict:fetch(Q, Dict), Arg}
+			end
+		end, Queries),
+		cast(Stream, {batch, Batch#batch_query{queries = Qs}}, ReplyTo)
+	end).
+
+-spec subscribe_events(Stream :: stream(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | error().
 subscribe_events(Stream, EventTypes, Timeout) ->
   call(Stream, {register, EventTypes}, Timeout).
+
+-spec subscribe_events_async(Stream :: stream(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+subscribe_events_async(Stream, EventTypes, ReplyTo) ->
+	cast(Stream, {register, EventTypes}, ReplyTo).
 
 from_cache(#stream{connection = #connection{host = Host, port = Port}}, Query) ->
   stmt_cache:from_cache({Host, Port, Query}).
@@ -106,12 +181,6 @@ loop(State) ->
 	end.
 
 
-%% -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) -> {reply, Reply :: term(), NewState :: #state{}} | {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-%%             {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
-%% handle_call(Request, From, State) ->
-%% 	handle_msg({call, From, Request}, State).  %% todo: remove
-
-
 handle_frame(Pid, Frame) ->
   Pid ! {handle_frame, Frame}.
 
@@ -119,18 +188,15 @@ reply_if_needed(Caller, Reply) ->
   case Caller of
     undefined ->
       ok;
-    {Pid, _} ->
-      erlang:send(Pid, {reply, Caller, Reply}, [noconnect])
+    {Pid, _} when is_pid(Pid) -> %% call reply
+      erlang:send(Pid, {reply, Caller, Reply}, [noconnect]);
+		Pid when is_pid(Pid) -> %% cast reply
+			erlang:send(Pid, Reply, [noconnect]);
+		Fun when is_function(Fun, 1) ->  %% cast reply
+			Fun(Reply);
+		{M, F, A} ->  %% cast reply
+			erlang:apply(M, F, A ++ [Reply])
   end.
-
-
-%% -spec(handle_cast(Request :: term(), State :: #state{}) -> {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), NewState :: #state{}}).
-%% handle_cast(Request, State) ->
-%%   handle_msg(Request, State).
-%%
-%% -spec(handle_info(Info :: timeout() | term(), State :: #state{}) -> {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} | {stop, Reason :: term(), NewState :: #state{}}).
-%% handle_info(Request, State) ->
-%%   handle_msg(Request, State).
 
 
 handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid = Connection}, compression = Compression, id = StreamId}) ->
@@ -237,3 +303,11 @@ call(#stream{stream_pid = Pid}, Msg, Timeout) ->
     error: Reason ->
       {error, Reason}
   end.
+
+cast(#stream{stream_pid = Pid}, Msg, AsyncTarget) ->
+	try
+		ok = erlang:send(Pid, {call, AsyncTarget, Msg}, [noconnect])
+	catch
+		error: Reason ->
+			{error, Reason}
+	end.
