@@ -407,7 +407,7 @@ execute_query(Connection, ID, Params, Timeout) ->
 -spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream = #stream{}, ID, Params, ReplyTo) ->
 	stream:execute_query_async(Stream, ID, Params, ReplyTo);
-execute_query_async(Connection, ID, ReplyTo, Params) ->
+execute_query_async(Connection, ID, Params, ReplyTo) ->
 	connection:execute_query_async(Connection, ID, Params, ReplyTo).
 
 %%% @doc

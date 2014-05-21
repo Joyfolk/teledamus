@@ -71,7 +71,7 @@ prepare_query(Stream, Query, Timeout) ->
 
 -spec prepare_query_async(Stream :: stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 prepare_query_async(Stream, Query, Timeout) ->
-	prepare_query(Stream, Query, Timeout, false).
+	prepare_query_async(Stream, Query, Timeout, false).
 
 -spec prepare_query(Stream :: stream(), Query :: string(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream, Query, Timeout, UseCache) ->
