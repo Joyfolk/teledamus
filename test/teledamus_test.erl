@@ -4,7 +4,7 @@
 -include_lib("native_protocol.hrl").
 -include_lib("cql_types.hrl").
 
--export([async_mfa/1]).
+-export([async_mfa/1, start/0, stop/1, start_mon/0, stop_mon/1, on_call/2, on_reply/2]).
 
 is_registered(_) ->
 	?_assertNot(undefined =:= whereis(teledamus_sup)),
@@ -656,3 +656,37 @@ batch_query_async_test_() ->
 
 
 
+simple_query_mon_test_() ->
+	{"monitoring api test"},
+	{setup, fun start_mon/0, fun stop_mon/1, fun(Connection) ->
+		A = teledamus:query(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000),
+		[?_assertMatch({_, _, _}, A),
+		 ?_assertEqual(2, length(ets:tab2list(teledamus))),
+		 ?_assertMatch({call, _, _}, hd(tl(ets:tab2list(teledamus)))),
+		 ?_assertMatch({reply, _, _}, hd(ets:tab2list(teledamus)))
+		]
+	end}.
+
+start_mon() ->
+	application:set_env(teledamus, channel_monitor, teledamus_test),
+	teledamus = ets:new(teledamus, [public, named_table]),
+	ok = teledamus:start(),
+	Con = teledamus:get_connection(),
+	#connection{} = Con,
+	Con.
+
+stop_mon(Con) ->
+	try
+		ok = teledamus:release_connection(Con)
+	after
+		teledamus:stop(),
+		ets:delete(teledamus),
+		application:unset_env(teledamus, cahnnel_monitor)
+	end.
+
+%% channel monitor callbacks
+on_call(From, Msg) ->
+	ets:insert(teledamus, {call, From, Msg}).
+
+on_reply(Caller, Reply) ->
+	ets:insert(teledamus, {reply, Caller, Reply}).

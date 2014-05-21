@@ -18,12 +18,8 @@
 -define(DEFAULT_STREAM_ID, 0).
 -define(DEF_STREAM_ETS, default_streams).
 
--type socket() :: gen_tcp:socket() | ssl:sslsocket().
--type compression() :: none | lz4 | snappy.
--type transport() :: tcp | ssl.
--export_type([compression/0, transport/0, socket/0]).
 
--record(state, {transport = gen_tcp :: transport(), socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: compression(), streams :: dict(), host :: list(), port :: pos_integer(), channel_monitor :: atom()}).
+-record(state, {transport = gen_tcp :: transport(), socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: compression(), streams :: dict(), host :: list(), port :: pos_integer()}).
 
 
 %%%===================================================================
@@ -168,12 +164,12 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
 			try
         set_active(Socket, Transport),
         Connection = #connection{pid = self(), host = Host, port = Port},
-				{ok, StreamId} = stream:start(Connection, ?DEFAULT_STREAM_ID, Compression),
+				{ok, StreamId} = stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
 				monitor(process, StreamId),
 				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
         DefStream2 = DefStream#stream{connection = Connection#connection{default_stream = DefStream}},
 				ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()), channel_monitor = ChannelMonitor}}
+        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
 		  catch
 				E: EE ->
 				  {stop, {error, E, EE}}

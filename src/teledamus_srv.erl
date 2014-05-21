@@ -7,28 +7,25 @@
 
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
--define(SERVER, ?MODULE).
-
 -type cnode() :: [{nonempty_string(), pos_integer()}].
--type transport() :: gen_tcp | ssl.
--record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: transport(), compression = none :: compression()}).
+-record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: transport(), compression = none :: compression(), channel_monitor :: atom()}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 get_connection() ->
-	gen_server:call(?SERVER, get_connection).
+	gen_server:call(?MODULE, get_connection).
 
 get_connection(Timeout) ->
-  gen_server:call(?SERVER, get_connection, Timeout).
+  gen_server:call(?MODULE, get_connection, Timeout).
 
 
 release_connection(Connection) ->
-	gen_server:call(?SERVER, {release_connection, Connection}).
+	gen_server:call(?MODULE, {release_connection, Connection}).
 
 release_connection(Connection, Timeout) ->
-  gen_server:call(?SERVER, {release_connection, Connection}, Timeout).
+  gen_server:call(?MODULE, {release_connection, Connection}, Timeout).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -39,6 +36,7 @@ release_connection(Connection, Timeout) ->
 -spec(start_link(list()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link(Args) ->
 	Credentials = {proplists:get_value(username, Args), proplists:get_value(password, Args)},
+	ChannelMonitor = proplists:get_value(channel_monitor, Args, undefined),
 	Nodes = proplists:get_value(cassandra_nodes, Args),
 	Transport = case proplists:get_value(transport, Args, tcp) of
 		tcp -> gen_tcp;
@@ -51,16 +49,16 @@ start_link(Args) ->
 	Compression = proplists:get_value(compression, Args, none),
   stmt_cache:init(),
 	connection:prepare_ets(),
-	gen_server:start_link({local, ?SERVER}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression], []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor], []).
 
 prepare_transport(gen_tcp, Args) ->
-	[{active, false}, {packet, raw}, binary, {nodelay, true}] ++ proplists:get_value(tcp_opts, Args, []);
+	proplists:get_value(tcp_opts, Args, []);
 prepare_transport(ssl, Args) ->
 	ok = application:ensure_started(asn1, permanent),
 	ok = application:ensure_started(crypto, permanent),
   ok = application:ensure_started(public_key, permanent),
   ok = application:ensure_started(ssl, permanent),
-	[{active, false}, {packet, raw}, binary, {nodelay, true}] ++ proplists:get_value(tcp_opts, Args, []) ++ proplists:get_value(ssl_opts, Args, []).
+	proplists:get_value(tcp_opts, Args, []) ++ proplists:get_value(ssl_opts, Args, []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -80,8 +78,8 @@ prepare_transport(ssl, Args) ->
 -spec(init(Args :: term()) ->
 	{ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
 	{stop, Reason :: term()} | ignore).
-init([RR, Opts, Credentials, Transport, Compression]) ->
-	{ok, #state{nodes = rr:reinit(RR), opts = Opts, credentials = Credentials, transport = Transport, compression = Compression}}.
+init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
+	{ok, #state{nodes = rr:reinit(RR), opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -99,7 +97,7 @@ init([RR, Opts, Credentials, Transport, Compression]) ->
 									 {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
 									 {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State) ->
-	#state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression} = State,
+	#state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor} = State,
 	case Request of
 		get_connection -> % todo: connection pooling
 			case rr:next(Nodes) of
@@ -111,7 +109,7 @@ handle_call(Request, From, State) ->
               case Transport:connect(Host, Port, Opts) of
                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
-                  {ok, Pid} = connection:start(Socket, Credentials, Transport, Compression, Host, Port),
+                  {ok, Pid} = connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor),
 									DefStream = connection:get_default_stream(#connection{pid = Pid}),
                   Connection = #connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
                   ok = Transport:controlling_process(Socket, Pid),
