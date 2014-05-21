@@ -4,10 +4,9 @@
 
 -include_lib("native_protocol.hrl").
 
--type socket() :: gen_tcp:socket() | ssl:sslsocket().
 
 %% API
--export([start/6, prepare_ets/0]).
+-export([start/6, start/7, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
          new_stream/2, release_stream/2, send_frame/2, get_default_stream/1]).
 
@@ -20,7 +19,12 @@
 -define(DEFAULT_STREAM_ID, 0).
 -define(DEF_STREAM_ETS, default_streams).
 
--record(state, {transport = gen_tcp :: tcp | ssl, socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: none | lz4 | snappy, streams :: dict(), host :: list(), port :: pos_integer()}).  %% stmts_cache::dict(binary(), list()), streams:: dict(pos_integer(), stream())
+-type socket() :: gen_tcp:socket() | ssl:sslsocket().
+-type compression() :: none | lz4 | snappy.
+-type transport() :: tcp | ssl.
+-export_type([compression/0, transport/0, socket/0]).
+
+-record(state, {transport = gen_tcp :: transport(), socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: compression(), streams :: dict(), host :: list(), port :: pos_integer(), channel_monitor :: atom()}).
 
 
 %%%===================================================================
@@ -139,7 +143,10 @@ prepare_ets() ->
 %% @end
 %%--------------------------------------------------------------------
 start(Socket, Credentials, Transport, Compression, Host, Port) ->
-  gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port], []).
+  gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port, undefined], []).
+
+start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor) ->
+	gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -156,7 +163,7 @@ start(Socket, Credentials, Transport, Compression, Host, Port) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Socket, Credentials, Transport, Compression, Host, Port]) ->
+init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) ->
   RR = case startup(Socket, Credentials, Transport, Compression) of
     ok ->
 			try
@@ -167,7 +174,7 @@ init([Socket, Credentials, Transport, Compression, Host, Port]) ->
 				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
         DefStream2 = DefStream#stream{connection = Connection#connection{default_stream = DefStream}},
 				ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
+        {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()), channel_monitor = ChannelMonitor}}
 		  catch
 				E: EE ->
 				  {stop, {error, E, EE}}
