@@ -11,6 +11,8 @@
 -export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
          execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0,
          new_stream/1, new_stream/2, release_stream/1, release_stream/2]).
+-export([options_async/2, query_async/3, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/3, execute_query_async/4,
+         batch_query_async/4, batch_query_async/3, subscribe_events_async/3]).
 
 -define(DEFAULT_TIMEOUT, 5000).
 
@@ -125,6 +127,17 @@ options(Stream = #stream{}) ->
 options(Connection) ->
   connection:options(Connection, ?DEFAULT_TIMEOUT).
 
+%%% @doc
+%%% Request DB for options (asynchronous version)
+%%%
+%%% Connection :: connection() | stream() - connection to DB, as returned from get_connection() or stream
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% @end
+-spec options_async(Connection :: connection() | stream(), async_target()) -> ok | {error, Reason :: term()}.
+options_async(Stream = #stream{}, ReplyTo) ->
+	connection:options_async(Stream, ReplyTo);
+options_async(Connection, ReplyTo) ->
+	connection:options_async(Connection, ReplyTo).
 
 %%% @doc
 %%% Request DB for options
@@ -148,9 +161,31 @@ options(Connection, Timeout) ->
 %%% @end
 -spec query(connection() | stream(), string()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{}, Query) ->
-  stream:query(Stream, Query, #query_params{}, ?DEFAULT_TIMEOUT);
+	stream:query(Stream, Query, #query_params{}, ?DEFAULT_TIMEOUT);
 query(Connection, Query) ->
-  connection:query(Connection, Query, #query_params{}, ?DEFAULT_TIMEOUT).
+	connection:query(Connection, Query, #query_params{}, ?DEFAULT_TIMEOUT).
+
+%%% @doc
+%%% Execute query with default parameters (asynchronous version)
+%%%
+%%% Connection :: connection() or stream() - connection to DB, as returned from get_connection() or stream
+%%% Query - string() with CQL query
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%%
+%%% Result - result of query or error or timeout.
+%%% @end
+-spec query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+query_async(Stream = #stream{}, Query, ReplyTo) ->
+  stream:query_async(Stream, Query, #query_params{}, ReplyTo);
+query_async(Connection, Query, ReplyTo) ->
+  connection:query_async(Connection, Query, #query_params{}, ReplyTo).
+
+%%% @doc
+%%% Execute query with default parameters & default timeout
+%%%
+%%% Connection or Stream - connection to DB, as returned from get_connection() or stream
+%%% Query - string with CQL query
+%%% Result - result of query or error or timeout.
 
 %%% @doc
 %%% Execute query with default parameters
@@ -183,6 +218,22 @@ query(Connection, Query, Params, Timeout) ->
   connection:query(Connection, Query, Params, Timeout).
 
 %%% @doc
+%%% Execute query (asynchronous version)
+%%%
+%%% Connection :: connection() or stream() - connection to DB, as returned from get_connection() or stream
+%%% Query - string() with CQL query
+%%% Params - query parameters
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%%
+%%% Result - result of query or error or timeout.
+%%% @end
+-spec query_async(Connection :: connection() | stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+query_async(Stream = #stream{}, Query, Params, ReplyTo) ->
+	stream:query_async(Stream, Query, Params, ReplyTo);
+query_async(Connection, Query, Params, ReplyTo) ->
+	connection:query_async(Connection, Query, Params, ReplyTo).
+
+%%% @doc
 %%% Execute query
 %%%
 %%% Connection - connection to DB, as returned from get_connection() or stream
@@ -200,6 +251,23 @@ query(Connection, Query, Params, Timeout, UseCache) ->
 
 
 %%% @doc
+%%% Execute query (asynchronous version)
+%%%
+%%% Connection :: connection() or stream() - connection to DB, as returned from get_connection() or stream
+%%% Query - string() with CQL query
+%%% Params - query parameters
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% UseCache - use cached preparestatements
+%%%
+%%% Result - result of query or error or timeout.
+%%% @end
+-spec query_async(Connection :: connection() | stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+query_async(Stream = #stream{}, Query, Params, ReplyTo, UseCache) ->
+	stream:query_async(Stream, Query, Params, ReplyTo, UseCache);
+query_async(Connection, Query, ReplyTo, Params, UseCache) ->
+	connection:query_async(Connection, Query, Params, ReplyTo, UseCache).
+
+%%% @doc
 %%% Create prepared statement
 %%%
 %%% Connection - connection to DB, as returned from get_connection() or stream
@@ -211,6 +279,20 @@ prepare_query(Stream = #stream{}, Query) ->
   stream:prepare_query(Stream, Query, ?DEFAULT_TIMEOUT);
 prepare_query(Connection, Query) ->
   connection:prepare_query(Connection, Query, ?DEFAULT_TIMEOUT).
+
+%%% @doc
+%%% Create prepared statement  (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% Query - string with CQL query
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% Result - {prepared_query_id() :: binary()} or error or timeout
+%%% @end
+-spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+prepare_query_async(Stream = #stream{}, Query, ReplyTo) ->
+	stream:prepare_query_async(Stream, Query, ReplyTo);
+prepare_query_async(Connection, Query, ReplyTo) ->
+	connection:prepare_query_async(Connection, Query, ReplyTo).
 
 %%% @doc
 %%% Create prepared statement
@@ -241,13 +323,26 @@ prepare_query(Stream = #stream{}, Query, Timeout, UseCache) ->
 prepare_query(Connection, Query, Timeout, UseCache) ->
   connection:prepare_query(Connection, Query, Timeout, UseCache).
 
+%%% @doc
+%%% Create prepared statement  (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% Query - string with CQL query
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% UseCache - use cached preparestatements
+%%% Result - {prepared_query_id() :: binary()} or error or timeout
+%%% @end
+-spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+prepare_query_async(Stream = #stream{}, Query, ReplyTo, UseCache) ->
+	stream:prepare_query_async(Stream, Query, ReplyTo, UseCache);
+prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
+	connection:prepare_query_async(Connection, Query, ReplyTo, UseCache).
 
 %%% @doc
 %%% Execute prepared statement with default parameters & default timeout
 %%%
 %%% Connection - connection to DB, as returned from get_connection() or stream
 %%% ID - prepared query ID
-%%% Params - query parameters
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
@@ -256,6 +351,19 @@ execute_query(Stream = #stream{}, ID) ->
   stream:execute_query(Stream, ID, #query_params{}, ?DEFAULT_TIMEOUT);
 execute_query(Connection, ID) ->
   connection:execute_query(Connection, ID, #query_params{}, ?DEFAULT_TIMEOUT).
+
+%%% @doc
+%%% Execute prepared statement with default parameters (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% ID - prepared query ID
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% Result - result of query or error or timeout.
+-spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+execute_query_async(Stream = #stream{}, ID, ReplyTo) ->
+	stream:execute_query_async(Stream, ID, #query_params{}, ReplyTo);
+execute_query_async(Connection, ID, ReplyTo) ->
+	connection:execute_query_async(Connection, ID, #query_params{}, ReplyTo).
 
 %%% @doc
 %%% Execute prepared statement with default parameters
@@ -287,19 +395,47 @@ execute_query(Stream = #stream{}, ID, Params, Timeout) ->
 execute_query(Connection, ID, Params, Timeout) ->
   connection:execute_query(Connection, ID, Params, Timeout).
 
+
 %%% @doc
-%%% Execute batch query
+%%% Execute prepared statement (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% ID - prepared query ID
+%%% Params - query parameters
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% Result - result of query or error or timeout.
+-spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+execute_query_async(Stream = #stream{}, ID, Params, ReplyTo) ->
+	stream:execute_query_async(Stream, ID, Params, ReplyTo);
+execute_query_async(Connection, ID, Params, ReplyTo) ->
+	connection:execute_query_async(Connection, ID, Params, ReplyTo).
+
+%%% @doc
+%%% Execute batch query with default timeout
 %%%
 %%% Connection - connection to DB, as returned from get_connection() or stream
 %%% Batch - batch query record. Contains list of queries in the batch. It can be prepared statements or simple DML cql queries (INSERT/UPDATE/DELETE, no SELECTs)
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), binary()) -> timeout | ok.
+-spec batch_query(connection() | stream(), batch_query()) -> timeout | ok | error().
 batch_query(Stream = #stream{}, Batch) ->
   stream:batch_query(Stream, Batch, ?DEFAULT_TIMEOUT);
 batch_query(Connection, Batch) ->
   connection:batch_query(Connection, Batch, ?DEFAULT_TIMEOUT).
 
+%%% @doc
+%%% Execute batch query (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% Batch - batch query record. Contains list of queries in the batch. It can be prepared statements or simple DML cql queries (INSERT/UPDATE/DELETE, no SELECTs)
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% Result - result of query or error or timeout.
+%%% @end
+-spec batch_query_async(Connection :: connection() | stream(), Batch :: batch_query(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+batch_query_async(Stream = #stream{}, Batch, ReplyTo) ->
+	stream:batch_query_async(Stream, Batch, ReplyTo);
+batch_query_async(Connection, Batch, ReplyTo) ->
+	connection:batch_query_async(Connection, Batch, ReplyTo).
 
 %%% @doc
 %%% Execute batch query
@@ -309,7 +445,7 @@ batch_query(Connection, Batch) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), binary(), timeout()) -> timeout | ok.
+-spec batch_query(connection() | stream(), batch_query(), timeout()) -> timeout | ok.
 batch_query(Stream = #stream{}, Batch, Timeout) ->
   stream:batch_query(Stream, Batch, Timeout);
 batch_query(Connection, Batch, Timeout) ->
@@ -325,11 +461,26 @@ batch_query(Connection, Batch, Timeout) ->
 %%% UseCache - use cached preparestatements
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), binary(), timeout(), boolean()) -> timeout | ok.
+-spec batch_query(connection() | stream(), batch_query(), timeout(), boolean()) -> timeout | ok | error().
 batch_query(Stream = #stream{}, Batch, Timeout, UseCache) ->
   stream:batch_query(Stream, Batch, Timeout, UseCache);
 batch_query(Connection, Batch, Timeout, UseCache) ->
   connection:batch_query(Connection, Batch, Timeout, UseCache).
+
+%%% @doc
+%%% Execute batch query (asynchronous version)
+%%%
+%%% Connection - connection to DB, as returned from get_connection() or stream
+%%% Batch - batch query record. Contains list of queries in the batch. It can be prepared statements or simple DML cql queries (INSERT/UPDATE/DELETE, no SELECTs)
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% UseCache - use cached preparestatements
+%%% Result - result of query or error or timeout.
+%%% @end
+-spec batch_query_async(Connection :: connection() | stream(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+batch_query_async(Stream = #stream{}, Batch, ReplyTo, UseCache) ->
+	stream:batch_query_async(Stream, Batch, ReplyTo, UseCache);
+batch_query_async(Connection, Batch, ReplyTo, UseCache) ->
+	connection:batch_query_async(Connection, Batch, ReplyTo, UseCache).
 
 %%% @doc
 %%% Subscribe to Cassandra cluster events.
@@ -340,18 +491,29 @@ batch_query(Connection, Batch, Timeout, UseCache) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - ok | timeout | error
 %%% @end
--spec subscribe_events(connection(), list(), timeout()) -> ok | timeout | error().
+-spec subscribe_events(connection(), list(string() | atom()), timeout()) -> ok | timeout | error().
 subscribe_events(Connection, EventTypes, Timeout) ->
   connection:subscribe_events(Connection, EventTypes, Timeout).
 
 %%% @doc
-%%% Subscribe to Cassandra cluster events.
+%%% Subscribe to Cassandra cluster events (use default timeout)
 %%% Events will be processed via 'cassandra_events' event manager
 %%%
 %%% Connection - connection to DB, as returned from get_connection()
 %%% EventType - types of events to subscribe (schema_change, topology_change or status_change)
 %%% Result - ok | timeout | error
 %%% @end
--spec subscribe_events(connection(), list()) -> ok | timeout | error().
+-spec subscribe_events(connection(), list(string() | atom())) -> ok | timeout | error().
 subscribe_events(Connection, EventTypes) ->
   connection:subscribe_events(Connection, EventTypes, ?DEFAULT_TIMEOUT).
+
+%%% Subscribe to Cassandra cluster events (asynchronous version)
+%%% Events will be processed via 'cassandra_events' event manager
+%%%
+%%% Connection - connection to DB, as returned from get_connection()
+%%% EventType - types of events to subscribe (schema_change, topology_change or status_change)
+%%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
+%%% Result - ok | timeout | error
+-spec subscribe_events_async(Connection :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+subscribe_events_async(Connection, EventTypes, ReplyTo) ->
+	connection:subscribe_events_async(Connection, EventTypes, ReplyTo).

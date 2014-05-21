@@ -4,6 +4,8 @@
 -include_lib("native_protocol.hrl").
 -include_lib("cql_types.hrl").
 
+-export([async_mfa/1, start/0, stop/1, start_mon/0, stop_mon/1, on_call/2, on_reply/2]).
+
 is_registered(_) ->
 	?_assertNot(undefined =:= whereis(teledamus_sup)),
 	?_assertNot(undefined =:= whereis(teledamus_srv)).
@@ -92,8 +94,11 @@ create_drop_ks_test_() ->
   {"Create/drop keyspace test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
     KS = teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #query_params{}, 3000),
+		timer:sleep(100),
     U = teledamus:query(Connection, "USE test", #query_params{}, 3000),
+		timer:sleep(100),
     D = teledamus:query(Connection, "DROP KEYSPACE test", #query_params{}, 3000),
+		timer:sleep(100),
     [?_assertEqual({created,"test", []}, KS),
      ?_assertEqual({keyspace, "test"}, U),
      ?_assertEqual({dropped,"test", []}, D)]
@@ -520,3 +525,168 @@ stream_new_stream_connection_test_() ->
       ?_assert(is_list(hd(Rows))),
       ?_assertEqual(length(Meta), length(hd(Rows)))]
   end}.
+
+ simple_async_api_pid_test_() ->
+	{"Simple async api test / pid"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, self()),
+		A = {Meta, Paging, Rows} = receive
+																 X =  {_, _, _} -> X
+															 after
+																 1000 -> timeout
+															 end,
+		[?_assertMatch({_, _, _}, A),
+			?_assertEqual(Paging, undefined),
+			?_assert(is_list(Meta)),
+			?_assert(is_list(Rows)),
+			?_assert(length(Rows) > 0),
+			?_assert(is_list(hd(Rows))),
+			?_assertEqual(length(Meta), length(hd(Rows)))]
+	end}.
+
+simple_async_api_fun_test_() ->
+	{"Simple async api test / pid"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		Pid = self(),
+		F = fun(X) -> Pid ! {reply, X} end,
+		ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, F),
+		A = {Meta, Paging, Rows} = receive
+																 {reply, X} -> X
+															 after
+																 1000 -> timeout
+															 end,
+		[?_assertMatch({_, _, _}, A),
+			?_assertEqual(Paging, undefined),
+			?_assert(is_list(Meta)),
+			?_assert(is_list(Rows)),
+			?_assert(length(Rows) > 0),
+			?_assert(is_list(hd(Rows))),
+			?_assertEqual(length(Meta), length(hd(Rows)))]
+	end}.
+
+simple_async_api_mfa_test_() ->
+	{"Simple async api test / pid"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, {teledamus_test, async_mfa, []}),
+		timer:sleep(1000),
+		{ok, A} = application:get_env(test, async_mfa),
+		{Meta, Paging, Rows} = A,
+		[?_assertMatch({_, _, _}, A),
+			?_assertEqual(Paging, undefined),
+			?_assert(is_list(Meta)),
+			?_assert(is_list(Rows)),
+			?_assert(length(Rows) > 0),
+			?_assert(is_list(hd(Rows))),
+			?_assertEqual(length(Meta), length(hd(Rows)))]
+	end}.
+
+async_mfa(X) ->
+	application:set_env(test, async_mfa, X).
+
+
+
+
+options_test_async_test_() ->
+	{"async OPTIONS"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		ok = teledamus:options_async(Connection, self()),
+		A = receive
+					X = [_H | _T] -> X
+				after
+					1000 -> timeout
+				end,
+		[?_assert(is_list(A)),
+			?_assert(proplists:is_defined("CQL_VERSION", A)),
+			?_assert(proplists:is_defined("COMPRESSION", A))]
+	end}.
+
+
+prepared_query_async_test_() ->
+	{"Prepared query test"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		ok = teledamus:prepare_query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = ?", self()),
+		Id = receive
+					 {X, _Meta, _ResMeta} -> X
+				after
+					1000 -> timeout
+				end,
+		ok = teledamus:execute_query_async(Connection, Id, #query_params{bind_values = [{varchar, "system"}]}, self()),
+		A = receive
+			XXX = {_, _, _} -> XXX
+		after
+			1000 -> timeout
+		end,
+		{Meta, Paging, Rows} = A,
+		[?_assert(is_binary(Id)),
+			?_assertMatch({_, _, _}, A),
+			?_assertEqual(Paging, undefined),
+			?_assert(is_list(Meta)),
+			?_assert(is_list(Rows)),
+			?_assert(length(Rows) > 0),
+			?_assert(is_list(hd(Rows))),
+			?_assertEqual(length(Meta), length(hd(Rows)))]
+	end}.
+
+batch_query_async_test_() ->
+	{"Batch query test"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #query_params{}, 3000),
+		teledamus:query(Connection, "USE test", #query_params{}, 3000),
+		teledamus:query(Connection, "CREATE TABLE test (test text PRIMARY KEY)", #query_params{}, 3000),
+		Pid = self(),
+		{Id, _, _} = teledamus:prepare_query(Connection, "INSERT INTO test(test) VALUES(?)", 3000),
+		ok = teledamus:batch_query_async(Connection, #batch_query{queries =
+		[
+			{Id, [{text, "1"}]}                                                       ,
+			{"INSERT INTO test(test) VALUES(?)", [{text, "2"}]},
+			{Id, [{text, "3"}]}
+		]}, fun(X) -> Pid ! {reply, X} end),
+		A = receive
+					{reply, X} -> X
+				after
+					1000 -> timeout
+				end,
+		B = teledamus:query(Connection, "SELECT test FROM test", #query_params{}, 3000),
+		teledamus:query(Connection, "DROP TABLE test", #query_params{}, 3000),
+		teledamus:query(Connection, "DROP KEYSPACE test", #query_params{}, 3000),
+		{_, _, Rows} = B,
+		[?_assertEqual(ok, A),
+			?_assertEqual([["1"], ["2"], ["3"]], lists:sort(Rows))]
+	end}.
+
+
+
+simple_query_mon_test_() ->
+	{"monitoring api test"},
+	{setup, fun start_mon/0, fun stop_mon/1, fun(Connection) ->
+		A = teledamus:query(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000),
+		[?_assertMatch({_, _, _}, A),
+		 ?_assertEqual(2, length(ets:tab2list(teledamus))),
+		 ?_assertMatch({call, _, _}, hd(tl(ets:tab2list(teledamus)))),
+		 ?_assertMatch({reply, _, _}, hd(ets:tab2list(teledamus)))
+		]
+	end}.
+
+start_mon() ->
+	application:set_env(teledamus, channel_monitor, teledamus_test),
+	teledamus = ets:new(teledamus, [public, named_table]),
+	ok = teledamus:start(),
+	Con = teledamus:get_connection(),
+	#connection{} = Con,
+	Con.
+
+stop_mon(Con) ->
+	try
+		ok = teledamus:release_connection(Con)
+	after
+		teledamus:stop(),
+		ets:delete(teledamus),
+		application:unset_env(teledamus, cahnnel_monitor)
+	end.
+
+%% channel monitor callbacks
+on_call(From, Msg) ->
+	ets:insert(teledamus, {call, From, Msg}).
+
+on_reply(Caller, Reply) ->
+	ets:insert(teledamus, {reply, Caller, Reply}).

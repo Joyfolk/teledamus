@@ -1,7 +1,7 @@
 {application, teledamus,
  [
   {description, "Erlang client library for Apache Cassandra"},
-  {vsn, "0.3.2"},
+  {vsn, "0.4.0"},
 
 	{registered, []},
 	{applications, [kernel, stdlib]},
@@ -12,7 +12,7 @@
 		{password, "cassandra"},
 
 		{transport, tcp}, %% ssl or tcp
-		{tcp_opts, []},
+		{tcp_opts, [{active, false}, {packet, raw}, binary, {nodelay, true}]},
 		{ssl_opts, [{mode, binary}]},
 		{compression, none} %% none or 3-tuple with compression name, 2-tuple compression module & function, threshold size (bytes)
 %% 		{compression, {"lz4", {lz4, pack, unpack}, 1024}} %% none or 3-tuple with compression name, 2-tuple compression module & function, threshold size (bytes)
