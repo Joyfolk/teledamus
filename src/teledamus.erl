@@ -288,7 +288,7 @@ prepare_query(Connection, Query) ->
 %%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
 %%% Result - {prepared_query_id() :: binary()} or error or timeout
 %%% @end
--spec prepare_query(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+-spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 prepare_query_async(Stream = #stream{}, Query, ReplyTo) ->
 	stream:prepare_query_async(Stream, Query, ReplyTo);
 prepare_query_async(Connection, Query, ReplyTo) ->
@@ -332,7 +332,7 @@ prepare_query(Connection, Query, Timeout, UseCache) ->
 %%% UseCache - use cached preparestatements
 %%% Result - {prepared_query_id() :: binary()} or error or timeout
 %%% @end
--spec prepare_query(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+-spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 prepare_query_async(Stream = #stream{}, Query, ReplyTo, UseCache) ->
 	stream:prepare_query_async(Stream, Query, ReplyTo, UseCache);
 prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
@@ -359,7 +359,7 @@ execute_query(Connection, ID) ->
 %%% ID - prepared query ID
 %%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
 %%% Result - result of query or error or timeout.
--spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), ReplyTo :: async_target()) -> ok | {error, Reason}.
+-spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream = #stream{}, ID, ReplyTo) ->
 	stream:execute_query_async(Stream, ID, #query_params{}, ReplyTo);
 execute_query_async(Connection, ID, ReplyTo) ->
@@ -404,7 +404,7 @@ execute_query(Connection, ID, Params, Timeout) ->
 %%% Params - query parameters
 %%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
 %%% Result - result of query or error or timeout.
--spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason}.
+-spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream = #stream{}, ID, Params, ReplyTo) ->
 	stream:execute_query_async(Stream, ID, Params, ReplyTo);
 execute_query_async(Connection, ID, ReplyTo, Params) ->
@@ -514,6 +514,6 @@ subscribe_events(Connection, EventTypes) ->
 %%% EventType - types of events to subscribe (schema_change, topology_change or status_change)
 %%% ReplyTo :: undefined | atom | pid() | fun/1 | {M, F, A} - asynchronous reply target (function or pid/name or undefined (for no reply))
 %%% Result - ok | timeout | error
--spec subscribe_events_async(Connection :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | {error, Reason}.
+-spec subscribe_events_async(Connection :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 subscribe_events_async(Connection, EventTypes, ReplyTo) ->
 	connection:subscribe_events_async(Connection, EventTypes, ReplyTo).

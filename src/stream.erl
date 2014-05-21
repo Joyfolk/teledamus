@@ -100,7 +100,7 @@ prepare_query_async(Stream, Query, ReplyTo, UseCache) ->
 execute_query(Stream, ID, Params, Timeout) ->
   call(Stream, {execute, ID, Params}, Timeout).
 
--spec execute_query(Stream :: stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
+-spec execute_query_async(Stream :: stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream, ID, Params, ReplyTo) ->
 	cast(Stream, {execute, ID, Params}, ReplyTo).
 

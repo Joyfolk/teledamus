@@ -91,7 +91,7 @@ execute_query_async(#connection{default_stream = Stream}, ID, Params, ReplyTo) -
 batch_query(#connection{default_stream = Stream}, Batch, Timeout) ->
   stream:batch_query(Stream, Batch, Timeout).
 
--spec batch_query(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 batch_query_async(#connection{default_stream = Stream}, Batch, ReplyTo) ->
 	stream:batch_query_async(Stream, Batch, ReplyTo).
 

@@ -92,8 +92,11 @@ create_drop_ks_test_() ->
   {"Create/drop keyspace test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
     KS = teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #query_params{}, 3000),
+		timer:sleep(100),
     U = teledamus:query(Connection, "USE test", #query_params{}, 3000),
+		timer:sleep(100),
     D = teledamus:query(Connection, "DROP KEYSPACE test", #query_params{}, 3000),
+		timer:sleep(100),
     [?_assertEqual({created,"test", []}, KS),
      ?_assertEqual({keyspace, "test"}, U),
      ?_assertEqual({dropped,"test", []}, D)]
@@ -520,3 +523,21 @@ stream_new_stream_connection_test_() ->
       ?_assert(is_list(hd(Rows))),
       ?_assertEqual(length(Meta), length(hd(Rows)))]
   end}.
+
+ simple_async_api_test_() ->
+	{"Simple async api test"},
+	{setup, fun start/0, fun stop/1, fun(Connection) ->
+		ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, self()),
+		A = {Meta, Paging, Rows} = receive
+			X =  {_, _, _} -> X
+		after
+			1000 -> timeout
+		end,
+		[?_assertMatch({_, _, _}, A),
+			?_assertEqual(Paging, undefined),
+			?_assert(is_list(Meta)),
+			?_assert(is_list(Rows)),
+			?_assert(length(Rows) > 0),
+			?_assert(is_list(hd(Rows))),
+			?_assertEqual(length(Meta), length(hd(Rows)))]
+	end}.
