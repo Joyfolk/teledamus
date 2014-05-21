@@ -595,7 +595,6 @@ options_test_async_test_() ->
 				after
 					1000 -> timeout
 				end,
-		error_logger:info_msg("A=~p", [A]),
 		[?_assert(is_list(A)),
 			?_assert(proplists:is_defined("CQL_VERSION", A)),
 			?_assert(proplists:is_defined("COMPRESSION", A))]
