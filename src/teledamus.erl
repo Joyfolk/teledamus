@@ -230,7 +230,7 @@ query(Connection, Query, Params, Timeout) ->
 -spec query_async(Connection :: connection() | stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 query_async(Stream = #stream{}, Query, Params, ReplyTo) ->
 	stream:query_async(Stream, Query, Params, ReplyTo);
-query_async(Connection, Query, ReplyTo, Params) ->
+query_async(Connection, Query, Params, ReplyTo) ->
 	connection:query_async(Connection, Query, Params, ReplyTo).
 
 %%% @doc
