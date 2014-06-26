@@ -216,8 +216,8 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
           end
       end;
 
-    {release_stream, #stream{stream_id = Id}} ->
-      %% todo: close something?
+    {release_stream, Stream = #stream{stream_id = Id}} ->
+      stream:stop(Stream),
       {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
 
     get_socket ->
