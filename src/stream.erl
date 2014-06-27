@@ -178,11 +178,14 @@ to_cache(#stream{connection = #connection{host = Host, port = Port}}, Query, Id)
 
 init(Connection, StreamId, Compression, ChannelMonitor) ->
     proc_lib:init_ack({ok, self()}),
-    process_flag(trap_exit, true),
+    erlang:monitor(process, Connection#connection.pid),
     loop(#state{connection = Connection, id = StreamId, compression = Compression, channel_monitor = ChannelMonitor}).
 
 loop(State) ->
     receive
+        {'DOWN', _MonitorRef, _Type, _Object, Info} ->
+            error_logger:error_msg("Connection down ~p: ~p", [State#state.connection, Info]),
+            exit(connection_down);
         Msg ->
             case handle_msg(Msg, State) of
                 {noreply, NewState} ->
@@ -319,9 +322,14 @@ call(#stream{stream_pid = Pid}, Msg, Timeout) ->
             receive
                 {reply, Tag, X} ->
                     erlang:demonitor(Mref, [flush]),
-                    X
+                    X;
+                {'DOWN', _MonitorRef, _Type, _Object, normal} ->
+                    ok;
+                {'DOWN', _MonitorRef, _Type, _Object, Info} ->
+                    {error, Info}
             after
-                Timeout -> {error, timeout}
+                Timeout ->
+                    {error, timeout}
             end
     catch
         error: Reason ->
