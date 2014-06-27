@@ -111,7 +111,7 @@ release_stream(Stream) ->
 %%% Stream - ...
 %%% Result - stream | {error, Reason}
 %%% @end
--spec release_stream(stream()) -> ok | {error, any()}.
+-spec release_stream_async(stream()) -> ok | {error, any()}.
 release_stream_async(Stream) ->
     connection:release_stream_async(Stream).
 
