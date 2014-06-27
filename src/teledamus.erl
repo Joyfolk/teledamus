@@ -10,7 +10,7 @@
 
 -export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
          execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0,
-         new_stream/1, new_stream/2, release_stream/1, release_stream/2]).
+         new_stream/1, new_stream/2, release_stream/1, release_stream/2, release_stream_async/1]).
 -export([options_async/2, query_async/3, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/3, execute_query_async/4,
          batch_query_async/4, batch_query_async/3, subscribe_events_async/3]).
 
@@ -103,6 +103,17 @@ new_stream(Connection = #connection{}, Timeout) ->
 -spec release_stream(stream()) -> ok | {error, any()}.
 release_stream(Stream) ->
   connection:release_stream(Stream, ?DEFAULT_TIMEOUT).
+
+
+%%% @doc
+%%% Release stream
+%%%
+%%% Stream - ...
+%%% Result - stream | {error, Reason}
+%%% @end
+-spec release_stream(stream()) -> ok | {error, any()}.
+release_stream_async(Stream) ->
+    connection:release_stream_async(Stream).
 
 
 %%% @doc
