@@ -1,7 +1,8 @@
 -module(examples).
 
 -export([start/0, stop/0, create_schema/0, drop_schema/0, load_test/1,  load_test/2, counters_test/1, counters_test/2, counters_test_stream/2,
-         load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4]).
+         load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4,
+         collections_test/3]).
 
 -include_lib("teledamus/include/native_protocol.hrl").
 
@@ -17,6 +18,7 @@ create_schema() ->
   {keyspace, "examples"} = teledamus:query(Con, "USE examples"),
   {created, "examples", "profiles"} = teledamus:query(Con, "CREATE TABLE IF NOT EXISTS profiles(s_id varchar, c_id varchar, v_id varchar, o_id varchar, PRIMARY KEY(s_id)) WITH caching = 'all' AND compaction =  { 'class' : 'SizeTieredCompactionStrategy' } AND compression = { 'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : 32, 'crc_check_chance' : 0.5}" ),
   {created, "examples", "counters"} = teledamus:query(Con, "CREATE TABLE IF NOT EXISTS counters(c1 counter, c2 counter, id1 varchar, id2 varchar, PRIMARY KEY(id1, id2))"),
+  {created, "examples", "collections"} = teledamus:query(Con, "CREATE TABLE IF NOT EXISTS collections(id1 int, id2 int, col set<varchar>, PRIMARY KEY(id1, id2))"),
   teledamus:release_connection(Con),
   ok.
 
@@ -25,6 +27,44 @@ drop_schema() ->
   {dropped, "examples", []} = teledamus:query(Con, "DROP KEYSPACE examples"),
   teledamus:release_connection(Con),
   ok.
+
+
+
+
+split_N([], _N, Acc) -> Acc;
+split_N(L, N, Acc) ->
+    case N >= length(L) of
+        true -> split_N([], N, [L | Acc]);
+        false ->
+            {L1, L2} = lists:split(N, L),
+            split_N(L2, N, [L1 | Acc])
+    end.
+
+
+collections_test(N, M, P) ->
+  Con = teledamus:get_connection(),
+  {keyspace, "examples"} = teledamus:query(Con, "USE examples"),
+  {Q, _, _} = teledamus:prepare_query(Con, "INSERT INTO collections(id1, id2, col) VALUES(?, ?, ?) IF NOT EXISTS"),
+  {Q2, _, _} = teledamus:prepare_query(Con, "UPDATE collections SET col = col - ? WHERE id1 = ? AND id2 = ?"),
+  Vals = lists:map(fun(I) -> "V_" ++ integer_to_list(I) end, lists:seq(1, M)),
+  Spl = split_N(Vals, P, []),
+  T0 = millis(),
+  lists:foreach(fun(X) ->
+      teledamus:execute_query(Con, Q, #query_params{consistency_level = one, bind_values = [{int, X}, {int, 1}, {{set, varchar}, Vals}]}, 1000)
+  end, lists:seq(1, N)),
+  T1 = millis(),
+  TS = lists:map(fun(J) ->
+      T = millis(),
+      lists:foreach(fun(L) ->
+          ok = teledamus:execute_query(Con, Q2, #query_params{consistency_level = quorum, bind_values = [{{set, varchar}, L}, {int, J}, {int, 1}]}, 1000)
+      end, Spl),
+      millis() - T
+  end, lists:seq(1, N)),
+  T2 = millis(),
+  R = {{insert, T1 - T0}, {update, T2 - T1}, {batches, TS}},
+  teledamus:release_connection(Con),
+  R.
+
 
 counters_test(M, N) ->
   Cons = lists:map(fun(_) ->
