@@ -8,7 +8,7 @@
 %% API
 -export([start/6, start/7, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
-         new_stream/2, release_stream/2, send_frame/2, get_default_stream/1]).
+         new_stream/2, release_stream/2, release_stream_async/1, send_frame/2, get_default_stream/1]).
 
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
@@ -36,7 +36,13 @@ new_stream(#connection{pid = Pid}, Timeout) ->
 
 -spec release_stream(stream(), timeout()) -> ok | error().
 release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
+  stream:stop(S),
   gen_server:call(Pid, {release_stream, S}, Timeout).
+
+-spec release_stream_async(stream()) -> ok | error().
+release_stream_async(S = #stream{connection = #connection{pid = Pid}}) ->
+    stream:stop(S),
+    gen_server:cast(Pid, {release_stream, S}).
 
 -spec options(Connection :: connection(), Timeout :: timeout()) ->  timeout | error() | options().
 options(#connection{default_stream = Stream}, Timeout) ->
@@ -217,7 +223,6 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
       end;
 
     {release_stream, #stream{stream_id = Id}} ->
-      %% todo: close something?
       {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
 
     get_socket ->
@@ -238,7 +243,7 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(Request, State = #state{transport = Transport, socket = Socket}) ->
+handle_cast(Request, State = #state{transport = Transport, socket = Socket, streams = Streams}) ->
 	case Request of
 		{send_frame, Frame} ->
 			case Transport of
@@ -248,6 +253,9 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket}) ->
 					Transport:send(Socket, Frame)
 			end,
 			{noreply, State};
+
+        {release_stream, #stream{stream_id = Id}} ->
+            {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
 
 		_ ->
 			error_logger:error_msg("Unknown request ~p~n", [Request]),
