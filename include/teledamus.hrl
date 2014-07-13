@@ -109,7 +109,7 @@
 
 %% queries
 -record(tdm_query_params, {consistency_level = quorum :: teledamus:consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
-                           bind_values = [] :: teledamus:bind_variables(), paging_state :: binary(), serial_consistency = undefined :: teledamus:consistency_level()}).
+    bind_values = [] :: teledamus:bind_variables(), paging_state :: binary(), serial_consistency = undefined :: teledamus:consistency_level()}).
 
 
 -define(BATCH_LOGGED, 0).

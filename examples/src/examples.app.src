@@ -1,9 +1,9 @@
 {application, examples,
- [
-  {description, "Teledamus Examples"},
-  {vsn, "0.5.0"},
-	{registered, []},
-	{applications, [kernel, stdlib, teledamus]},
-	{env, [	 ]}
- ]
+    [
+        {description, "Teledamus Examples"},
+        {vsn, "0.5.0"},
+        {registered, []},
+        {applications, [kernel, stdlib, teledamus]},
+        {env, [	 ]}
+    ]
 }.
