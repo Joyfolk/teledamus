@@ -1,4 +1,4 @@
--module(rr_test).
+-module(tdm_rr_test).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("teledamus_rr.hrl").

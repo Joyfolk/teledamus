@@ -1,5 +1,5 @@
 %% -*- coding: utf-8 -*-
--module(native_parser_test).
+-module(tdm_native_parser_test).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("teledamus.hrl").

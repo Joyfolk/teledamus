@@ -1,5 +1,5 @@
 %% -*- coding: utf-8 -*-
--module(cql_types_test).
+-module(tdm_cql_types_test).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("teledamus.hrl").
