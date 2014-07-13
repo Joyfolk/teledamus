@@ -1,9 +1,9 @@
--module(stmt_cache).
+-module(tdm_stmt_cache).
 %% @doc
 %% Prepared statement caching facilities
 %% @end
 
--include_lib("native_protocol.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 %% API
 -export([init/0, to_cache/2, from_cache/1, cache/3, cache_async/3, cache_async_multple/3]).
@@ -60,7 +60,7 @@ cache(Query, Con, Timeout) ->
 		[{_, Id}] ->
 			{ok, Id};
     [] ->
-      case connection:prepare_query(Con, Query, Timeout) of
+      case tdm_connection:prepare_query(Con, Query, Timeout) of
         {PreparedStmtId, _, _} ->
           ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),
           {ok, PreparedStmtId};
@@ -76,7 +76,7 @@ cache_async(Query, Con, ReplyTo) ->
 		[{_, Id}] ->
 			{ok, Id};
 		[] ->
-			connection:prepare_query_async(Con, Query, fun(Res) ->
+			tdm_connection:prepare_query_async(Con, Query, fun(Res) ->
 				case Res of
 					{PreparedStmtId, _, _} ->
 						ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),

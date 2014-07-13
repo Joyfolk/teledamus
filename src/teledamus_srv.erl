@@ -2,8 +2,8 @@
 
 -behaviour(gen_server).
 
--include_lib("rr.hrl").
--include_lib("native_protocol.hrl").
+-include_lib("tdm_rr.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
@@ -47,8 +47,8 @@ start_link(Args) ->
 		#rr_state{resources = Nodes, rr = Nodes}
 	end,
 	Compression = proplists:get_value(compression, Args, none),
-  stmt_cache:init(),
-	connection:prepare_ets(),
+  tdm_stmt_cache:init(),
+	tdm_connection:prepare_ets(),
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor], []).
 
 prepare_transport(gen_tcp, Args) ->
@@ -79,7 +79,7 @@ prepare_transport(ssl, Args) ->
 	{ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
 	{stop, Reason :: term()} | ignore).
 init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
-	{ok, #state{nodes = rr:reinit(RR), opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor}}.
+	{ok, #state{nodes = tdm_rr:reinit(RR), opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -100,7 +100,7 @@ handle_call(Request, From, State) ->
 	#state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor} = State,
 	case Request of
 		get_connection -> % todo: connection pooling
-			case rr:next(Nodes) of
+			case tdm_rr:next(Nodes) of
 				{error_no_resources, _S} ->
 					throw(error_no_resources);
 				{{Host, Port}, NS} ->
@@ -109,8 +109,8 @@ handle_call(Request, From, State) ->
               case Transport:connect(Host, Port, Opts) of
                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
-                  {ok, Pid} = connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor),
-									DefStream = connection:get_default_stream(#connection{pid = Pid}),
+                  {ok, Pid} = tdm_connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor),
+									DefStream = tdm_connection:get_default_stream(#connection{pid = Pid}),
                   Connection = #connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
                   ok = Transport:controlling_process(Socket, Pid),
                   gen_server:reply(From, Connection);
@@ -130,7 +130,7 @@ handle_call(Request, From, State) ->
       #connection{pid = Pid} = Connection,
 			case is_process_alive(Pid) of
 				true ->
-					Socket = connection:get_socket(Connection),
+					Socket = tdm_connection:get_socket(Connection),
 					Transport:close(Socket),
 					{reply, ok, State};
 				false ->
@@ -154,11 +154,11 @@ handle_cast(Request, State) ->
 	%% todo: add public api and/or automatic cluster changes discovery
 	case Request of
 		{add_node, Host, Port} ->
-			{noreply, State#state{nodes = rr:add(Nodes, {Host, Port})}};
+			{noreply, State#state{nodes = tdm_rr:add(Nodes, {Host, Port})}};
 		{remove_node, Host, Port} ->
-			{noreply, State#state{nodes = rr:remove(Nodes, {Host, Port})}};
+			{noreply, State#state{nodes = tdm_rr:remove(Nodes, {Host, Port})}};
 		reload_nodes ->
-			{noreply, State#state{nodes = rr:reinit(Nodes)}};
+			{noreply, State#state{nodes = tdm_rr:reinit(Nodes)}};
     _ ->
       {noreply, State}
 	end.

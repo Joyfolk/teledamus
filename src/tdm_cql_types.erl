@@ -1,6 +1,6 @@
--module(cql_types).
+-module(tdm_cql_types).
 
--include_lib("cql_types.hrl").
+-include_lib("tdm_cql_types.hrl").
 
 %% API
 -export([decode_t/2, decode_v/2, decode_tv/2, encode_t/1, encode/2, erase_type/1, decode/2]).

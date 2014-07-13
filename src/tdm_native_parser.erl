@@ -1,6 +1,6 @@
--module(native_parser).
+-module(tdm_native_parser).
 
--include_lib("native_protocol.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 %% API
 -export([parse_frame_header/1, encode_frame_header/1, parse_frame/2, encode_frame/2, parse_flags/1, encode_flags/1]).
@@ -500,9 +500,9 @@ parse_row(Data, Acc, ColSpecs) ->
 		[H | T] ->
       {V, X0} = case H of
         [] -> %% no metadata, use blob
-          cql_types:decode(blob, Data);
+          tdm_cql_types:decode(blob, Data);
         {_K, _T, _N, Type} ->
-          cql_types:decode(Type, Data);
+          tdm_cql_types:decode(Type, Data);
         U ->
           error_logger:error_msg("Uparseable colspec ~p~n", [U])
       end,
@@ -637,7 +637,7 @@ encode_values(BindValues) ->
 	N = encode_short(length(BindValues)),
 
 	V = list_to_binary(lists:map(fun(X) ->
-    cql_types:encode_t(X)
+    tdm_cql_types:encode_t(X)
   end,  BindValues)),
 	<<N/binary,V/binary>>.
 

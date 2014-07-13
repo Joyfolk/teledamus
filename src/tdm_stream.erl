@@ -1,4 +1,4 @@
--module(stream).
+-module(tdm_stream).
 
 %% -behaviour(gen_server).
 
@@ -8,7 +8,7 @@
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/4]).
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
--include_lib("native_protocol.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 
 -record(state, {connection :: connection(), id :: 1..127, caller :: term(), compression = none :: compression(), channel_monitor :: atom()}).
@@ -53,7 +53,7 @@ query_async(Stream, Query, Params, ReplyTo) ->
 query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
     case UseCache of
         true ->
-            case stmt_cache:cache(Query, Con, Timeout) of
+            case tdm_stmt_cache:cache(Query, Con, Timeout) of
                 {ok, Id} -> call(Stream, {execute, Id, Params}, Timeout);
                 Err = #error{} -> Err
             end;
@@ -65,7 +65,7 @@ query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
 query_async(Stream = #stream{connection = Con}, Query, Params, ReplyTo, UseCache) ->
     case UseCache of
         true ->
-            stmt_cache:cache_async(Query, Con, fun(Res) ->
+            tdm_stmt_cache:cache_async(Query, Con, fun(Res) ->
                 case Res of
                     {ok, Id} -> cast(Stream, {execute, Id, Params}, ReplyTo);
                     Err = #error{} -> Err
@@ -132,7 +132,7 @@ batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Q
                 fun({Id, Args}) when is_binary(Id) ->
                     {Id, Args};
                    ({Query, Args}) when is_list(Query) ->
-                       case stmt_cache:cache(Query, Con, Timeout) of
+                       case tdm_stmt_cache:cache(Query, Con, Timeout) of
                            {ok, Id} ->
                                {Id, Args};
                            Err ->
@@ -150,7 +150,7 @@ batch_query_async(Stream, Batch, ReplyTo, false) ->
     batch_query_async(Stream, Batch, ReplyTo);
 batch_query_async(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, ReplyTo, true) ->
     ToCache = lists:filter(fun({Q, _Args}) -> is_list(Q) end, Queries),
-    stmt_cache:cache_async_multple(ToCache, Con, fun(Dict) ->
+    tdm_stmt_cache:cache_async_multple(ToCache, Con, fun(Dict) ->
         Qs = lists:map(fun({Q, Arg}) ->
             if
                 is_binary(Q) -> {Q, Arg};
@@ -169,10 +169,10 @@ subscribe_events_async(Stream, EventTypes, ReplyTo) ->
     cast(Stream, {register, EventTypes}, ReplyTo).
 
 from_cache(#stream{connection = #connection{host = Host, port = Port}}, Query) ->
-    stmt_cache:from_cache({Host, Port, Query}).
+    tdm_stmt_cache:from_cache({Host, Port, Query}).
 
 to_cache(#stream{connection = #connection{host = Host, port = Port}}, Query, Id) ->
-    stmt_cache:to_cache({Host, Port, Query}, Id).
+    tdm_stmt_cache:to_cache({Host, Port, Query}, Id).
 
 
 
@@ -232,38 +232,38 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
 
                 options ->
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {query, Query, Params} ->
-                    Body = native_parser:encode_query(Query, Params),
+                    Body = tdm_native_parser:encode_query(Query, Params),
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {prepare, Query} ->
-                    Body = native_parser:encode_long_string(Query),
+                    Body = tdm_native_parser:encode_long_string(Query),
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {execute, ID, Params} ->
-                    Body = native_parser:encode_query(ID, Params),
+                    Body = tdm_native_parser:encode_query(ID, Params),
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {batch, BatchQuery} ->
-                    Body = native_parser:encode_batch_query(BatchQuery),
+                    Body = tdm_native_parser:encode_batch_query(BatchQuery),
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {register, EventTypes} ->
                     start_gen_event_if_required(),
-                    Body = native_parser:encode_event_types(EventTypes),
+                    Body = tdm_native_parser:encode_event_types(EventTypes),
                     Frame = #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
-                    connection:send_frame(Connection, native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 _ ->
@@ -276,7 +276,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
             OpCode = (Frame#frame.header)#header.opcode,
             case OpCode of
                 ?OPC_ERROR ->
-                    Error = native_parser:parse_error(Frame),
+                    Error = tdm_native_parser:parse_error(Frame),
                     error_logger:error_msg("CQL error ~p~n", [Error]),
                     reply_if_needed(Caller, {error, Error}, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
@@ -287,15 +287,15 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
                     throw({not_supported_option, authentificate}),
                     {noreply, State};
                 ?OPC_SUPPORTED ->
-                    {Options, _} = native_parser:parse_string_multimap(Frame#frame.body),
+                    {Options, _} = tdm_native_parser:parse_string_multimap(Frame#frame.body),
                     reply_if_needed(Caller, Options, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_RESULT ->
-                    Result = native_parser:parse_result(Frame),
+                    Result = tdm_native_parser:parse_result(Frame),
                     reply_if_needed(Caller, Result, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_EVENT ->
-                    Result = native_parser:parse_event(Frame),
+                    Result = tdm_native_parser:parse_event(Frame),
                     gen_event:notify(cassandra_events, Result),
                     {noreply, State};
                 _ ->

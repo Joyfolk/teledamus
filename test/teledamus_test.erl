@@ -1,8 +1,8 @@
 -module(teledamus_test).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("native_protocol.hrl").
--include_lib("cql_types.hrl").
+-include_lib("tdm_native_protocol.hrl").
+-include_lib("tdm_cql_types.hrl").
 
 -export([async_mfa/1, start/0, stop/1, start_mon/0, stop_mon/1, on_call/2, on_reply/2]).
 
@@ -497,10 +497,10 @@ cached_query_connection_test_() ->
 cached_query_stream_test_() ->
   {"Cached query stream test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
-    Stream = connection:new_stream(Connection, 1000),
+    Stream = tdm_connection:new_stream(Connection, 1000),
     A = teledamus:query(Stream, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000, true),
     {Meta, Paging, Rows} = A,
-    connection:release_stream(Stream, 1000),
+    tdm_connection:release_stream(Stream, 1000),
     [?_assertMatch({_, _, _}, A),
       ?_assertEqual(Paging, undefined),
       ?_assert(is_list(Meta)),
@@ -513,10 +513,10 @@ cached_query_stream_test_() ->
 stream_new_stream_connection_test_() ->
   {"Cached query new stream / connection test"},
   {setup, fun start/0, fun stop/1, fun(Connection) ->
-    Stream = connection:new_stream(Connection, 1000),
+    Stream = tdm_connection:new_stream(Connection, 1000),
     A = teledamus:query(Stream#stream.connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #query_params{}, 3000, true),
     {Meta, Paging, Rows} = A,
-    connection:release_stream(Stream, 1000),
+    tdm_connection:release_stream(Stream, 1000),
     [?_assertMatch({_, _, _}, A),
       ?_assertEqual(Paging, undefined),
       ?_assert(is_list(Meta)),

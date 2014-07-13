@@ -6,7 +6,7 @@
 %%%-------------------------------------------------------------------
 -module(teledamus).
 
--include_lib("native_protocol.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 -export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
          execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0,
@@ -80,7 +80,7 @@ release_connection(Connection = #connection{}, Timeout) ->
 %%% @end
 -spec new_stream(connection()) -> stream() | {error, any()}.
 new_stream(Connection = #connection{}) ->
-  connection:new_stream(Connection, ?DEFAULT_TIMEOUT).
+  tdm_connection:new_stream(Connection, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Create new stream for given connection
@@ -91,7 +91,7 @@ new_stream(Connection = #connection{}) ->
 %%% @end
 -spec new_stream(connection(), timeout()) -> stream() | {error, any()}.
 new_stream(Connection = #connection{}, Timeout) ->
-  connection:new_stream(Connection, Timeout).
+  tdm_connection:new_stream(Connection, Timeout).
 
 
 %%% @doc
@@ -102,7 +102,7 @@ new_stream(Connection = #connection{}, Timeout) ->
 %%% @end
 -spec release_stream(stream()) -> ok | {error, any()}.
 release_stream(Stream) ->
-  connection:release_stream(Stream, ?DEFAULT_TIMEOUT).
+  tdm_connection:release_stream(Stream, ?DEFAULT_TIMEOUT).
 
 
 %%% @doc
@@ -113,7 +113,7 @@ release_stream(Stream) ->
 %%% @end
 -spec release_stream_async(stream()) -> ok | {error, any()}.
 release_stream_async(Stream) ->
-    connection:release_stream_async(Stream).
+    tdm_connection:release_stream_async(Stream).
 
 
 %%% @doc
@@ -125,7 +125,7 @@ release_stream_async(Stream) ->
 %%% @end
 -spec release_stream(stream(), timeout()) -> ok | {error, any()}.
 release_stream(Stream, Timeout) ->
-  connection:release_stream(Stream, Timeout).
+  tdm_connection:release_stream(Stream, Timeout).
 
 %%% @doc
 %%% Request DB for options
@@ -134,9 +134,9 @@ release_stream(Stream, Timeout) ->
 %%% @end
 -spec options(connection() | stream()) -> timeout | error() | options().
 options(Stream = #stream{}) ->
-  connection:options(Stream, ?DEFAULT_TIMEOUT);
+  tdm_connection:options(Stream, ?DEFAULT_TIMEOUT);
 options(Connection) ->
-  connection:options(Connection, ?DEFAULT_TIMEOUT).
+  tdm_connection:options(Connection, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Request DB for options (asynchronous version)
@@ -146,9 +146,9 @@ options(Connection) ->
 %%% @end
 -spec options_async(Connection :: connection() | stream(), async_target()) -> ok | {error, Reason :: term()}.
 options_async(Stream = #stream{}, ReplyTo) ->
-	connection:options_async(Stream, ReplyTo);
+	tdm_connection:options_async(Stream, ReplyTo);
 options_async(Connection, ReplyTo) ->
-	connection:options_async(Connection, ReplyTo).
+	tdm_connection:options_async(Connection, ReplyTo).
 
 %%% @doc
 %%% Request DB for options
@@ -158,9 +158,9 @@ options_async(Connection, ReplyTo) ->
 %%% @end
 -spec options(connection() | stream(), timeout()) -> timeout | error() | options().
 options(Stream = #stream{}, Timeout) ->
-  stream:options(Stream, Timeout);
+  tdm_stream:options(Stream, Timeout);
 options(Connection, Timeout) ->
-  connection:options(Connection, Timeout).
+  tdm_connection:options(Connection, Timeout).
 
 
 %%% @doc
@@ -172,9 +172,9 @@ options(Connection, Timeout) ->
 %%% @end
 -spec query(connection() | stream(), string()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{}, Query) ->
-	stream:query(Stream, Query, #query_params{}, ?DEFAULT_TIMEOUT);
+	tdm_stream:query(Stream, Query, #query_params{}, ?DEFAULT_TIMEOUT);
 query(Connection, Query) ->
-	connection:query(Connection, Query, #query_params{}, ?DEFAULT_TIMEOUT).
+	tdm_connection:query(Connection, Query, #query_params{}, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Execute query with default parameters (asynchronous version)
@@ -187,9 +187,9 @@ query(Connection, Query) ->
 %%% @end
 -spec query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 query_async(Stream = #stream{}, Query, ReplyTo) ->
-  stream:query_async(Stream, Query, #query_params{}, ReplyTo);
+  tdm_stream:query_async(Stream, Query, #query_params{}, ReplyTo);
 query_async(Connection, Query, ReplyTo) ->
-  connection:query_async(Connection, Query, #query_params{}, ReplyTo).
+  tdm_connection:query_async(Connection, Query, #query_params{}, ReplyTo).
 
 %%% @doc
 %%% Execute query with default parameters & default timeout
@@ -208,9 +208,9 @@ query_async(Connection, Query, ReplyTo) ->
 %%% @end
 -spec query(connection() | stream(), string(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{}, Query, Timeout) ->
-  stream:query(Stream, Query, #query_params{}, Timeout);
+  tdm_stream:query(Stream, Query, #query_params{}, Timeout);
 query(Connection, Query, Timeout) ->
-  connection:query(Connection, Query, #query_params{}, Timeout).
+  tdm_connection:query(Connection, Query, #query_params{}, Timeout).
 
 
 %%% @doc
@@ -224,9 +224,9 @@ query(Connection, Query, Timeout) ->
 %%% @end
 -spec query(connection()| stream(), string(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{}, Query, Params, Timeout) ->
-  stream:query(Stream, Query, Params, Timeout);
+  tdm_stream:query(Stream, Query, Params, Timeout);
 query(Connection, Query, Params, Timeout) ->
-  connection:query(Connection, Query, Params, Timeout).
+  tdm_connection:query(Connection, Query, Params, Timeout).
 
 %%% @doc
 %%% Execute query (asynchronous version)
@@ -240,9 +240,9 @@ query(Connection, Query, Params, Timeout) ->
 %%% @end
 -spec query_async(Connection :: connection() | stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 query_async(Stream = #stream{}, Query, Params, ReplyTo) ->
-	stream:query_async(Stream, Query, Params, ReplyTo);
+	tdm_stream:query_async(Stream, Query, Params, ReplyTo);
 query_async(Connection, Query, Params, ReplyTo) ->
-	connection:query_async(Connection, Query, Params, ReplyTo).
+	tdm_connection:query_async(Connection, Query, Params, ReplyTo).
 
 %%% @doc
 %%% Execute query
@@ -256,9 +256,9 @@ query_async(Connection, Query, Params, ReplyTo) ->
 %%% @end
 -spec query(connection() | stream(), string(), query_params(), timeout(), boolean()) -> timeout | ok | error() | result_rows() | schema_change().
 query(Stream = #stream{}, Query, Params, Timeout, UseCache) ->
-  stream:query(Stream, Query, Params, Timeout, UseCache);
+  tdm_stream:query(Stream, Query, Params, Timeout, UseCache);
 query(Connection, Query, Params, Timeout, UseCache) ->
-  connection:query(Connection, Query, Params, Timeout, UseCache).
+  tdm_connection:query(Connection, Query, Params, Timeout, UseCache).
 
 
 %%% @doc
@@ -274,9 +274,9 @@ query(Connection, Query, Params, Timeout, UseCache) ->
 %%% @end
 -spec query_async(Connection :: connection() | stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 query_async(Stream = #stream{}, Query, Params, ReplyTo, UseCache) ->
-	stream:query_async(Stream, Query, Params, ReplyTo, UseCache);
+	tdm_stream:query_async(Stream, Query, Params, ReplyTo, UseCache);
 query_async(Connection, Query, ReplyTo, Params, UseCache) ->
-	connection:query_async(Connection, Query, Params, ReplyTo, UseCache).
+	tdm_connection:query_async(Connection, Query, Params, ReplyTo, UseCache).
 
 %%% @doc
 %%% Create prepared statement
@@ -287,9 +287,9 @@ query_async(Connection, Query, ReplyTo, Params, UseCache) ->
 %%% @end
 -spec prepare_query(connection() | stream(), string()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #stream{}, Query) ->
-  stream:prepare_query(Stream, Query, ?DEFAULT_TIMEOUT);
+  tdm_stream:prepare_query(Stream, Query, ?DEFAULT_TIMEOUT);
 prepare_query(Connection, Query) ->
-  connection:prepare_query(Connection, Query, ?DEFAULT_TIMEOUT).
+  tdm_connection:prepare_query(Connection, Query, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Create prepared statement  (asynchronous version)
@@ -301,9 +301,9 @@ prepare_query(Connection, Query) ->
 %%% @end
 -spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 prepare_query_async(Stream = #stream{}, Query, ReplyTo) ->
-	stream:prepare_query_async(Stream, Query, ReplyTo);
+	tdm_stream:prepare_query_async(Stream, Query, ReplyTo);
 prepare_query_async(Connection, Query, ReplyTo) ->
-	connection:prepare_query_async(Connection, Query, ReplyTo).
+	tdm_connection:prepare_query_async(Connection, Query, ReplyTo).
 
 %%% @doc
 %%% Create prepared statement
@@ -315,9 +315,9 @@ prepare_query_async(Connection, Query, ReplyTo) ->
 %%% @end
 -spec prepare_query(connection() | stream, string(), timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #stream{}, Query, Timeout) ->
-  stream:prepare_query(Stream, Query, Timeout);
+  tdm_stream:prepare_query(Stream, Query, Timeout);
 prepare_query(Connection, Query, Timeout) ->
-  connection:prepare_query(Connection, Query, Timeout).
+  tdm_connection:prepare_query(Connection, Query, Timeout).
 
 %%% @doc
 %%% Create prepared statement
@@ -330,9 +330,9 @@ prepare_query(Connection, Query, Timeout) ->
 %%% @end
 -spec prepare_query(connection() | stream, string(), timeout(), boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #stream{}, Query, Timeout, UseCache) ->
-  stream:prepare_query(Stream, Query, Timeout, UseCache);
+  tdm_stream:prepare_query(Stream, Query, Timeout, UseCache);
 prepare_query(Connection, Query, Timeout, UseCache) ->
-  connection:prepare_query(Connection, Query, Timeout, UseCache).
+  tdm_connection:prepare_query(Connection, Query, Timeout, UseCache).
 
 %%% @doc
 %%% Create prepared statement  (asynchronous version)
@@ -345,9 +345,9 @@ prepare_query(Connection, Query, Timeout, UseCache) ->
 %%% @end
 -spec prepare_query_async(Connection :: connection() | stream(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 prepare_query_async(Stream = #stream{}, Query, ReplyTo, UseCache) ->
-	stream:prepare_query_async(Stream, Query, ReplyTo, UseCache);
+	tdm_stream:prepare_query_async(Stream, Query, ReplyTo, UseCache);
 prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
-	connection:prepare_query_async(Connection, Query, ReplyTo, UseCache).
+	tdm_connection:prepare_query_async(Connection, Query, ReplyTo, UseCache).
 
 %%% @doc
 %%% Execute prepared statement with default parameters & default timeout
@@ -359,9 +359,9 @@ prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
 %%% @end
 -spec execute_query(connection() | stream(), binary()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #stream{}, ID) ->
-  stream:execute_query(Stream, ID, #query_params{}, ?DEFAULT_TIMEOUT);
+  tdm_stream:execute_query(Stream, ID, #query_params{}, ?DEFAULT_TIMEOUT);
 execute_query(Connection, ID) ->
-  connection:execute_query(Connection, ID, #query_params{}, ?DEFAULT_TIMEOUT).
+  tdm_connection:execute_query(Connection, ID, #query_params{}, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Execute prepared statement with default parameters (asynchronous version)
@@ -372,9 +372,9 @@ execute_query(Connection, ID) ->
 %%% Result - result of query or error or timeout.
 -spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream = #stream{}, ID, ReplyTo) ->
-	stream:execute_query_async(Stream, ID, #query_params{}, ReplyTo);
+	tdm_stream:execute_query_async(Stream, ID, #query_params{}, ReplyTo);
 execute_query_async(Connection, ID, ReplyTo) ->
-	connection:execute_query_async(Connection, ID, #query_params{}, ReplyTo).
+	tdm_connection:execute_query_async(Connection, ID, #query_params{}, ReplyTo).
 
 %%% @doc
 %%% Execute prepared statement with default parameters
@@ -387,9 +387,9 @@ execute_query_async(Connection, ID, ReplyTo) ->
 %%% @end
 -spec execute_query(connection() | stream(), binary(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #stream{}, ID, Timeout) ->
-  stream:execute_query(Stream, ID, #query_params{}, Timeout);
+  tdm_stream:execute_query(Stream, ID, #query_params{}, Timeout);
 execute_query(Connection, ID, Timeout) ->
-  connection:execute_query(Connection, ID, #query_params{}, Timeout).
+  tdm_connection:execute_query(Connection, ID, #query_params{}, Timeout).
 
 %%% @doc
 %%% Execute prepared statement
@@ -402,9 +402,9 @@ execute_query(Connection, ID, Timeout) ->
 %%% @end
 -spec execute_query(connection() | stream(), binary(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #stream{}, ID, Params, Timeout) ->
-  stream:execute_query(Stream, ID, Params, Timeout);
+  tdm_stream:execute_query(Stream, ID, Params, Timeout);
 execute_query(Connection, ID, Params, Timeout) ->
-  connection:execute_query(Connection, ID, Params, Timeout).
+  tdm_connection:execute_query(Connection, ID, Params, Timeout).
 
 
 %%% @doc
@@ -417,9 +417,9 @@ execute_query(Connection, ID, Params, Timeout) ->
 %%% Result - result of query or error or timeout.
 -spec execute_query_async(Connection :: connection() | stream(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 execute_query_async(Stream = #stream{}, ID, Params, ReplyTo) ->
-	stream:execute_query_async(Stream, ID, Params, ReplyTo);
+	tdm_stream:execute_query_async(Stream, ID, Params, ReplyTo);
 execute_query_async(Connection, ID, Params, ReplyTo) ->
-	connection:execute_query_async(Connection, ID, Params, ReplyTo).
+	tdm_connection:execute_query_async(Connection, ID, Params, ReplyTo).
 
 %%% @doc
 %%% Execute batch query with default timeout
@@ -430,9 +430,9 @@ execute_query_async(Connection, ID, Params, ReplyTo) ->
 %%% @end
 -spec batch_query(connection() | stream(), batch_query()) -> timeout | ok | error().
 batch_query(Stream = #stream{}, Batch) ->
-  stream:batch_query(Stream, Batch, ?DEFAULT_TIMEOUT);
+  tdm_stream:batch_query(Stream, Batch, ?DEFAULT_TIMEOUT);
 batch_query(Connection, Batch) ->
-  connection:batch_query(Connection, Batch, ?DEFAULT_TIMEOUT).
+  tdm_connection:batch_query(Connection, Batch, ?DEFAULT_TIMEOUT).
 
 %%% @doc
 %%% Execute batch query (asynchronous version)
@@ -444,9 +444,9 @@ batch_query(Connection, Batch) ->
 %%% @end
 -spec batch_query_async(Connection :: connection() | stream(), Batch :: batch_query(), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 batch_query_async(Stream = #stream{}, Batch, ReplyTo) ->
-	stream:batch_query_async(Stream, Batch, ReplyTo);
+	tdm_stream:batch_query_async(Stream, Batch, ReplyTo);
 batch_query_async(Connection, Batch, ReplyTo) ->
-	connection:batch_query_async(Connection, Batch, ReplyTo).
+	tdm_connection:batch_query_async(Connection, Batch, ReplyTo).
 
 %%% @doc
 %%% Execute batch query
@@ -458,9 +458,9 @@ batch_query_async(Connection, Batch, ReplyTo) ->
 %%% @end
 -spec batch_query(connection() | stream(), batch_query(), timeout()) -> timeout | ok.
 batch_query(Stream = #stream{}, Batch, Timeout) ->
-  stream:batch_query(Stream, Batch, Timeout);
+  tdm_stream:batch_query(Stream, Batch, Timeout);
 batch_query(Connection, Batch, Timeout) ->
-  connection:batch_query(Connection, Batch, Timeout).
+  tdm_connection:batch_query(Connection, Batch, Timeout).
 
 
 %%% @doc
@@ -474,9 +474,9 @@ batch_query(Connection, Batch, Timeout) ->
 %%% @end
 -spec batch_query(connection() | stream(), batch_query(), timeout(), boolean()) -> timeout | ok | error().
 batch_query(Stream = #stream{}, Batch, Timeout, UseCache) ->
-  stream:batch_query(Stream, Batch, Timeout, UseCache);
+  tdm_stream:batch_query(Stream, Batch, Timeout, UseCache);
 batch_query(Connection, Batch, Timeout, UseCache) ->
-  connection:batch_query(Connection, Batch, Timeout, UseCache).
+  tdm_connection:batch_query(Connection, Batch, Timeout, UseCache).
 
 %%% @doc
 %%% Execute batch query (asynchronous version)
@@ -489,9 +489,9 @@ batch_query(Connection, Batch, Timeout, UseCache) ->
 %%% @end
 -spec batch_query_async(Connection :: connection() | stream(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 batch_query_async(Stream = #stream{}, Batch, ReplyTo, UseCache) ->
-	stream:batch_query_async(Stream, Batch, ReplyTo, UseCache);
+	tdm_stream:batch_query_async(Stream, Batch, ReplyTo, UseCache);
 batch_query_async(Connection, Batch, ReplyTo, UseCache) ->
-	connection:batch_query_async(Connection, Batch, ReplyTo, UseCache).
+	tdm_connection:batch_query_async(Connection, Batch, ReplyTo, UseCache).
 
 %%% @doc
 %%% Subscribe to Cassandra cluster events.
@@ -504,7 +504,7 @@ batch_query_async(Connection, Batch, ReplyTo, UseCache) ->
 %%% @end
 -spec subscribe_events(connection(), list(string() | atom()), timeout()) -> ok | timeout | error().
 subscribe_events(Connection, EventTypes, Timeout) ->
-  connection:subscribe_events(Connection, EventTypes, Timeout).
+  tdm_connection:subscribe_events(Connection, EventTypes, Timeout).
 
 %%% @doc
 %%% Subscribe to Cassandra cluster events (use default timeout)
@@ -516,7 +516,7 @@ subscribe_events(Connection, EventTypes, Timeout) ->
 %%% @end
 -spec subscribe_events(connection(), list(string() | atom())) -> ok | timeout | error().
 subscribe_events(Connection, EventTypes) ->
-  connection:subscribe_events(Connection, EventTypes, ?DEFAULT_TIMEOUT).
+  tdm_connection:subscribe_events(Connection, EventTypes, ?DEFAULT_TIMEOUT).
 
 %%% Subscribe to Cassandra cluster events (asynchronous version)
 %%% Events will be processed via 'cassandra_events' event manager
@@ -527,4 +527,4 @@ subscribe_events(Connection, EventTypes) ->
 %%% Result - ok | timeout | error
 -spec subscribe_events_async(Connection :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | {error, Reason :: term()}.
 subscribe_events_async(Connection, EventTypes, ReplyTo) ->
-	connection:subscribe_events_async(Connection, EventTypes, ReplyTo).
+	tdm_connection:subscribe_events_async(Connection, EventTypes, ReplyTo).

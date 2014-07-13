@@ -1,6 +1,6 @@
--module(rr).
+-module(tdm_rr).
 
--include_lib("rr.hrl").
+-include_lib("tdm_rr.hrl").
 
 %% API
 -export([next/1, add/2, remove/2, from_app/2, reinit/1]).

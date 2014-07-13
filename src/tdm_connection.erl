@@ -1,8 +1,8 @@
--module(connection).
+-module(tdm_connection).
 
 -behaviour(gen_server).
 
--include_lib("native_protocol.hrl").
+-include_lib("tdm_native_protocol.hrl").
 
 
 %% API
@@ -36,85 +36,85 @@ new_stream(#connection{pid = Pid}, Timeout) ->
 
 -spec release_stream(stream(), timeout()) -> ok | error().
 release_stream(S = #stream{connection = #connection{pid = Pid}}, Timeout) ->
-  stream:stop(S),
+  tdm_stream:stop(S),
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
 -spec release_stream_async(stream()) -> ok | error().
 release_stream_async(S = #stream{connection = #connection{pid = Pid}}) ->
-    stream:stop(S),
+    tdm_stream:stop(S),
     gen_server:cast(Pid, {release_stream, S}).
 
 -spec options(Connection :: connection(), Timeout :: timeout()) ->  timeout | error() | options().
 options(#connection{default_stream = Stream}, Timeout) ->
-  stream:options(Stream, Timeout).
+  tdm_stream:options(Stream, Timeout).
 
 -spec options_async(Connection :: connection(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 options_async(#connection{default_stream = Stream}, Timeout) ->
-	stream:options_async(Stream, Timeout).
+	tdm_stream:options_async(Stream, Timeout).
 
 -spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 query(#connection{default_stream = Stream}, Query, Params, Timeout) ->
-	stream:query(Stream, Query, Params, Timeout).
+	tdm_stream:query(Stream, Query, Params, Timeout).
 
 -spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 query_async(#connection{default_stream = Stream}, Query, Params, ReplyTo) ->
-	stream:query_async(Stream, Query, Params, ReplyTo).
+	tdm_stream:query_async(Stream, Query, Params, ReplyTo).
 
 -spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error() | result_rows() | schema_change().
 query(#connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
-	stream:query(Stream, Query, Params, Timeout, UseCache).
+	tdm_stream:query(Stream, Query, Params, Timeout, UseCache).
 
 -spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 query_async(#connection{default_stream = Stream}, Query, Params, ReplyTo, UseCache) ->
-	stream:query_async(Stream, Query, Params, ReplyTo, UseCache).
+	tdm_stream:query_async(Stream, Query, Params, ReplyTo, UseCache).
 
 -spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(#connection{default_stream = Stream}, Query, Timeout) ->
-	stream:prepare_query(Stream, Query, Timeout).
+	tdm_stream:prepare_query(Stream, Query, Timeout).
 
 -spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 prepare_query_async(#connection{default_stream = Stream}, Query, ReplyTo) ->
-	stream:prepare_query_async(Stream, Query, ReplyTo).
+	tdm_stream:prepare_query_async(Stream, Query, ReplyTo).
 
 -spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
 prepare_query(#connection{default_stream = Stream}, Query, Timeout, UseCache) ->
-	stream:prepare_query(Stream, Query, Timeout, UseCache).
+	tdm_stream:prepare_query(Stream, Query, Timeout, UseCache).
 
 -spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 prepare_query_async(#connection{default_stream = Stream}, Query, ReplyTo, UseCache) ->
-	stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
+	tdm_stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
 
 -spec execute_query(Con :: connection(), ID :: binary(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
 execute_query(#connection{default_stream = Stream}, ID, Params, Timeout) ->
-  stream:execute_query(Stream, ID, Params, Timeout).
+  tdm_stream:execute_query(Stream, ID, Params, Timeout).
 
 -spec execute_query_async(Con :: connection(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 execute_query_async(#connection{default_stream = Stream}, ID, Params, ReplyTo) ->
-	stream:execute_query_async(Stream, ID, Params, ReplyTo).
+	tdm_stream:execute_query_async(Stream, ID, Params, ReplyTo).
 
 -spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout()) -> timeout | ok | error().
 batch_query(#connection{default_stream = Stream}, Batch, Timeout) ->
-  stream:batch_query(Stream, Batch, Timeout).
+  tdm_stream:batch_query(Stream, Batch, Timeout).
 
 -spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
 batch_query_async(#connection{default_stream = Stream}, Batch, ReplyTo) ->
-	stream:batch_query_async(Stream, Batch, ReplyTo).
+	tdm_stream:batch_query_async(Stream, Batch, ReplyTo).
 
 -spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error().
 batch_query(#connection{default_stream = Stream}, Batch, Timeout, UseCache) ->
-	stream:batch_query(Stream, Batch, Timeout, UseCache).
+	tdm_stream:batch_query(Stream, Batch, Timeout, UseCache).
 
 -spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 batch_query_async(#connection{default_stream = Stream}, Batch, ReplyTo, UseCache) ->
-	stream:batch_query_async(Stream, Batch, ReplyTo, UseCache).
+	tdm_stream:batch_query_async(Stream, Batch, ReplyTo, UseCache).
 
 -spec subscribe_events(Con :: connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | error().
 subscribe_events(#connection{default_stream = Stream}, EventTypes, Timeout) ->
-	stream:subscribe_events(Stream, EventTypes, Timeout).
+	tdm_stream:subscribe_events(Stream, EventTypes, Timeout).
 
 -spec subscribe_events_async(Con :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | timeout | {error, Reason :: term()}.
 subscribe_events_async(#connection{default_stream = Stream}, EventTypes, ReplyTo) ->
-	stream:subscribe_events_async(Stream, EventTypes, ReplyTo).
+	tdm_stream:subscribe_events_async(Stream, EventTypes, ReplyTo).
 
 -spec get_socket(Con :: connection()) -> socket() | {error, Reason :: term()}.
 get_socket(#connection{pid = Pid})->
@@ -122,11 +122,11 @@ get_socket(#connection{pid = Pid})->
 
 -spec from_cache(Con :: connection(), Query :: string()) -> {ok, binary()} | not_found.
 from_cache(#connection{host = Host, port = Port}, Query) ->
-  stmt_cache:from_cache({Host, Port, Query}).
+  tdm_stmt_cache:from_cache({Host, Port, Query}).
 
 -spec to_cache(Con :: connection(), Query :: string(), PreparedStmtId :: binary()) -> true.
 to_cache(#connection{host = Host, port = Port}, Query, PreparedStmtId) ->
-  stmt_cache:to_cache({Host, Port, Query}, PreparedStmtId).
+  tdm_stmt_cache:to_cache({Host, Port, Query}, PreparedStmtId).
 
 -spec prepare_ets() -> default_streams.
 prepare_ets() ->
@@ -170,7 +170,7 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
 			try
         set_active(Socket, Transport),
         Connection = #connection{pid = self(), host = Host, port = Port},
-				{ok, StreamId} = stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
+				{ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
 				monitor(process, StreamId),
 				DefStream = #stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
         DefStream2 = DefStream#stream{connection = Connection#connection{default_stream = DefStream}},
@@ -213,7 +213,7 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
         StreamId ->
           DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
           Connection = #connection{pid = self(), host = Host, port = Port, default_stream = DefStream},
-          case stream:start(Connection, StreamId, Compression) of
+          case tdm_stream:start(Connection, StreamId, Compression) of
             {ok, StreamPid} ->
               Stream = #stream{connection = Connection, stream_pid = StreamPid, stream_id = StreamId},
               {reply, Stream, State#state{streams = dict:store(StreamId, Stream, Streams)}};
@@ -274,7 +274,7 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
 %% @end
 %%--------------------------------------------------------------------
 handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport, buffer = Buffer, compression = Compression} = State) ->
-  case native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
+  case tdm_native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
     {undefined, NewBuffer} ->
 %%       set_active(Socket, Transport),
       {noreply, State#state{buffer = NewBuffer}};
@@ -283,7 +283,7 @@ handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport,
   end;
 
 handle_info({ssl, Socket, Data}, #state{socket = Socket, buffer = Buffer, compression = Compression} = State) ->
-  case native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
+  case tdm_native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
     {undefined, NewBuffer} ->
       {noreply, State#state{buffer = NewBuffer}};
     {Frame, NewBuffer} ->
@@ -361,7 +361,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 send(Socket, Transport, Compression, Frame) ->
-  F = native_parser:encode_frame(Frame, Compression),
+  F = tdm_native_parser:encode_frame(Frame, Compression),
   Transport:send(Socket, F).
 
 
@@ -378,10 +378,10 @@ handle_frame(Frame = #frame{header = Header}, State = #state{streams = Streams})
 	case dict:is_key(StreamId, Streams) of
 		true ->
 			Stream = dict:fetch(StreamId, Streams),
-			stream:handle_frame(Stream#stream.stream_pid, Frame);
+			tdm_stream:handle_frame(Stream#stream.stream_pid, Frame);
 		false ->
 			Stream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
-			stream:handle_frame(Stream#stream.stream_pid, Frame)
+			tdm_stream:handle_frame(Stream#stream.stream_pid, Frame)
 	end,
 	{noreply, State}.
 
@@ -399,16 +399,16 @@ startup_opts(Compression) ->
 
 
 startup(Socket, Credentials, Transport, Compression) ->
-  case send(Socket, Transport, Compression, #frame{header = #header{opcode = ?OPC_STARTUP, type = request}, body = native_parser:encode_string_map(startup_opts(Compression))}) of
+  case send(Socket, Transport, Compression, #frame{header = #header{opcode = ?OPC_STARTUP, type = request}, body = tdm_native_parser:encode_string_map(startup_opts(Compression))}) of
     ok ->
       {Frame, _R} = read_frame(Socket, Transport, Compression),
       case (Frame#frame.header)#header.opcode of
         ?OPC_ERROR ->
-          Error = native_parser:parse_error(Frame),
+          Error = tdm_native_parser:parse_error(Frame),
           error_logger:error_msg("CQL error ~p~n", [Error]),
           {error, Error};
         ?OPC_AUTHENTICATE ->
-          {Authenticator, _Rest} = native_parser:parse_string(Frame#frame.body),
+          {Authenticator, _Rest} = tdm_native_parser:parse_string(Frame#frame.body),
           authenticate(Socket, Authenticator, Credentials, Transport, Compression);
         ?OPC_READY ->
           ok;
@@ -429,7 +429,7 @@ read_frame(Socket, Transport, Compression) ->
                    {ok, <<>>}
                end,
   F = <<Data/binary,Body/binary>>,
-  native_parser:parse_frame(F, Compression).
+  tdm_native_parser:parse_frame(F, Compression).
 
 
 encode_plain_credentials(User, Password) when is_list(User) ->
@@ -437,7 +437,7 @@ encode_plain_credentials(User, Password) when is_list(User) ->
 encode_plain_credentials(User, Password) when is_list(Password) ->
   encode_plain_credentials(User, list_to_binary(Password));
 encode_plain_credentials(User, Password) when is_binary(User), is_binary(Password)->
-  native_parser:encode_bytes(<<0,User/binary,0,Password/binary>>).
+  tdm_native_parser:encode_bytes(<<0,User/binary,0,Password/binary>>).
 
 
 authenticate(Socket, Authenticator, Credentials, Transport, Compression) ->
@@ -448,7 +448,7 @@ authenticate(Socket, Authenticator, Credentials, Transport, Compression) ->
       {Frame, _R} = read_frame(Socket, Transport, Compression),
       case (Frame#frame.header)#header.opcode of
         ?OPC_ERROR ->
-          Error = native_parser:parse_error(Frame),
+          Error = tdm_native_parser:parse_error(Frame),
           error_logger:error_msg("Authentication error [~p]: ~p~n", [Authenticator, Error]),
           {error, Error};
         ?OPC_AUTH_CHALLENGE ->
