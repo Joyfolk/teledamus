@@ -4,7 +4,7 @@
          load_test_multi/2, load_test_multi/3, load_test_stream/1, load_test_stream/2, load_test_multi_stream/2, load_test_multi_stream/3, prepare_data/2, load_test_multi_stream_multi/3, load_test_multi_stream_multi/4,
          collections_test/3]).
 
--include_lib("teledamus/include/tdm_native_protocol.hrl").
+-include_lib("teledamus/include/teledamus.hrl").
 
 start() ->
   application:ensure_started(teledamus).

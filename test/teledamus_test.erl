@@ -1,8 +1,7 @@
 -module(teledamus_test).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("tdm_native_protocol.hrl").
--include_lib("tdm_cql_types.hrl").
+-include_lib("teledamus.hrl").
 
 -export([async_mfa/1, start/0, stop/1, start_mon/0, stop_mon/1, on_call/2, on_reply/2]).
 

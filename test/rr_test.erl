@@ -1,7 +1,7 @@
 -module(rr_test).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("tdm_rr.hrl").
+-include_lib("teledamus_rr.hrl").
 
 set_env(Env) ->
 	application:set_env(test, round_robin, Env).

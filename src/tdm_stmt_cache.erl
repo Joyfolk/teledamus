@@ -3,7 +3,7 @@
 %% Prepared statement caching facilities
 %% @end
 
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus.hrl").
 
 %% API
 -export([init/0, to_cache/2, from_cache/1, cache/3, cache_async/3, cache_async_multple/3]).

@@ -1,3 +1,17 @@
+%% custom data format
+-record(tdm_decimal, {scale :: integer(), value :: integer()}).
+-type big_decimal() :: #tdm_decimal{}.
+-export_type([big_decimal/0]).
+
+-type ipv4() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+-type ipv6() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+-record(tdm_inet, {ip :: ipv4() | ipv6()}).
+-type inet() :: #tdm_inet{}.
+-export_type([ipv4/0, ipv6/0, inet/0]).
+
+
+
+
 -define(MAX_BODY_LENGTH, 268435455). %% from spec: currently a frame is limited to 256MB in length
 -define(MAX_SHORT_LENGTH, 65535).
 -define(MAX_LONG_LENGTH, 2147483647).
@@ -143,3 +157,5 @@
 
 -type async_target() :: undefined | atom() | pid() | fun(() -> any()) | {atom(), atom(), list()}.
 -export_type([async_target/0]).
+
+

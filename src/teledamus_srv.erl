@@ -2,8 +2,8 @@
 
 -behaviour(gen_server).
 
--include_lib("tdm_rr.hrl").
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus_rr.hrl").
+-include_lib("teledamus.hrl").
 
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 

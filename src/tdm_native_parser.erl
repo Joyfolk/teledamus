@@ -1,6 +1,6 @@
 -module(tdm_native_parser).
 
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus.hrl").
 
 %% API
 -export([parse_frame_header/1, encode_frame_header/1, parse_frame/2, encode_frame/2, parse_flags/1, encode_flags/1]).

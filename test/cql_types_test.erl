@@ -2,8 +2,7 @@
 -module(cql_types_test).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("tdm_cql_types.hrl").
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus.hrl").
 
 encode_test() ->
 	?assertEqual(<<5:32,1,2,3,4,5>>, tdm_cql_types:encode({custom, "Abc"}, <<1,2,3,4,5>>)),

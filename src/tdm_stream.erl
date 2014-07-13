@@ -8,7 +8,7 @@
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/4]).
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus.hrl").
 
 
 -record(state, {connection :: connection(), id :: 1..127, caller :: term(), compression = none :: compression(), channel_monitor :: atom()}).

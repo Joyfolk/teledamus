@@ -2,8 +2,7 @@
 -module(native_parser_test).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("tdm_native_protocol.hrl").
--include_lib("tdm_cql_types.hrl").
+-include_lib("teledamus.hrl").
 
 -export([dummy_zip/1, dummy_unzip/1]).
 

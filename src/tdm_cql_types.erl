@@ -1,6 +1,15 @@
 -module(tdm_cql_types).
 
--include_lib("tdm_cql_types.hrl").
+-include_lib("teledamus.hrl").
+
+%% cql types
+-type cql_value_type() :: atom() | term(). %% should be recursive type definition, but it's not supported by erlang
+-type cql_data() :: binary().
+-type cql_value() :: any().
+-type cql_tagged_value() :: {cql_value_type(), cql_value()}.
+%% -type cql_string() :: string() | list(non_neg_integer()).
+%% -export_type([cql_value_type/0, cql_data/0, cql_value/0, cql_tagged_value/0, cql_string/0]).
+
 
 %% API
 -export([decode_t/2, decode_v/2, decode_tv/2, encode_t/1, encode/2, erase_type/1, decode/2]).

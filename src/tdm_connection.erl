@@ -2,7 +2,7 @@
 
 -behaviour(gen_server).
 
--include_lib("tdm_native_protocol.hrl").
+-include_lib("teledamus.hrl").
 
 
 %% API
