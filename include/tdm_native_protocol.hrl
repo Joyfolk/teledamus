@@ -2,10 +2,10 @@
 -define(MAX_SHORT_LENGTH, 65535).
 -define(MAX_LONG_LENGTH, 2147483647).
 
--record(flags, {compressing = false:: boolean(), tracing = false:: boolean()}).
--record(header, {type :: request | response, version = 2::0..127, flags = #flags{} :: #flags{}, stream = 1 :: -127..128, opcode :: byte()}).
--record(frame, {header :: #header{}, length :: integer(), body :: binary()}).
--record(error, {error_code :: integer(), type :: atom(), message :: string(), additional_info :: term()}).
+-record(tdm_flags, {compressing = false:: boolean(), tracing = false:: boolean()}).
+-record(tdm_header, {type :: request | response, version = 2::0..127, flags = #tdm_flags{} :: #tdm_flags{}, stream = 1 :: -127..128, opcode :: byte()}).
+-record(tdm_frame, {header :: #tdm_header{}, length :: integer(), body :: binary()}).
+-record(tdm_error, {error_code :: integer(), type :: atom(), message :: string(), additional_info :: term()}).
 
 
 
@@ -103,10 +103,10 @@
 
 
 %% queries
--record(query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
-                       bind_values = []:: list(any()), paging_state :: binary(), serial_consistency = undefined :: consistency_level()}).
+-record(tdm_query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
+                           bind_values = []:: list(any()), paging_state :: binary(), serial_consistency = undefined :: consistency_level()}).
 
--type query_params() :: #query_params{}.
+-type query_params() :: #tdm_query_params{}.
 -export_type([query_params/0]).
 
 -define(BATCH_LOGGED, 0).
@@ -118,16 +118,16 @@
 -type simple_batch_query() :: {string(), list()}.
 -type single_batch_query() :: prepared_batch_query() | simple_batch_query().
 
--record(batch_query, {batch_type = logged :: batch_type(), queries :: list(single_batch_query()), consistency_level = quorum:: consistency_level()}).
--type batch_query() :: #batch_query{}.
+-record(tdm_batch_query, {batch_type = logged :: batch_type(), queries :: list(single_batch_query()), consistency_level = quorum:: consistency_level()}).
+-type batch_query() :: #tdm_batch_query{}.
 
 
--record(connection, {pid :: pid(), host :: list(), port :: pos_integer(), default_stream :: stream()}).
--record(stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
+-record(tdm_connection, {pid :: pid(), host :: list(), port :: pos_integer(), default_stream :: stream()}).
+-record(tdm_stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
 
--type error() :: #error{}.
--type stream() :: #stream{}.
--type connection() :: #connection{}.
+-type error() :: #tdm_error{}.
+-type stream() :: #tdm_stream{}.
+-type connection() :: #tdm_connection{}.
 -type compression() :: none | lz4 | snappy.
 -type options() :: [{string(), string()}].
 -type keyspace() :: {keyspace, string()}.

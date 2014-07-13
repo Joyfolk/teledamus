@@ -8,33 +8,33 @@
 -export([dummy_zip/1, dummy_unzip/1]).
 
 parse_flags_test() ->
-	?assertEqual(<<3>>, tdm_native_parser:encode_flags(#flags{compressing = true, tracing = true})),
-	?assertEqual(<<1>>, tdm_native_parser:encode_flags(#flags{compressing = true, tracing = false})),
-	?assertEqual(<<2>>, tdm_native_parser:encode_flags(#flags{compressing = false, tracing = true})),
-	?assertEqual(#flags{compressing = true, tracing = true}, tdm_native_parser:parse_flags(<<3>>)),
-	?assertEqual(#flags{compressing = false, tracing = true}, tdm_native_parser:parse_flags(<<2>>)),
-	?assertEqual(#flags{compressing = true, tracing = false}, tdm_native_parser:parse_flags(<<1>>)).
+	?assertEqual(<<3>>, tdm_native_parser:encode_flags(#tdm_flags{compressing = true, tracing = true})),
+	?assertEqual(<<1>>, tdm_native_parser:encode_flags(#tdm_flags{compressing = true, tracing = false})),
+	?assertEqual(<<2>>, tdm_native_parser:encode_flags(#tdm_flags{compressing = false, tracing = true})),
+	?assertEqual(#tdm_flags{compressing = true, tracing = true}, tdm_native_parser:parse_flags(<<3>>)),
+	?assertEqual(#tdm_flags{compressing = false, tracing = true}, tdm_native_parser:parse_flags(<<2>>)),
+	?assertEqual(#tdm_flags{compressing = true, tracing = false}, tdm_native_parser:parse_flags(<<1>>)).
 
 parse_header_test() ->
-	H = #header{type = request, version = 2, flags = #flags{compressing = true, tracing = false}, opcode = 12, stream = 37},
+	H = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37},
 	?assertEqual(<<0:1,2:7,1:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H)),
-	?assertEqual(<<1:1,3:7,1:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#header{type = response, version = 3})),
-	?assertEqual(<<0:1,2:7,3:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#header{flags = #flags{tracing = true, compressing = true}})),
-	?assertEqual(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>, tdm_native_parser:encode_frame_header(H#header{opcode = 21, stream = -1})),
+	?assertEqual(<<1:1,3:7,1:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{type = response, version = 3})),
+	?assertEqual(<<0:1,2:7,3:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}})),
+	?assertEqual(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{opcode = 21, stream = -1})),
 	?assertEqual(H, tdm_native_parser:parse_frame_header(<<0:1,2:7,1:8,37:8,12:8>>)),
-	?assertEqual(H#header{type = response, version = 3}, tdm_native_parser:parse_frame_header(<<1:1,3:7,1:8,37:8,12:8>>)),
-	?assertEqual(H#header{flags = #flags{tracing = true, compressing = true}}, tdm_native_parser:parse_frame_header(<<0:1,2:7,3:8,37:8,12:8>>)),
-	?assertEqual(H#header{opcode = 21, stream = -1}, tdm_native_parser:parse_frame_header(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>)).
+	?assertEqual(H#tdm_header{type = response, version = 3}, tdm_native_parser:parse_frame_header(<<1:1,3:7,1:8,37:8,12:8>>)),
+	?assertEqual(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}}, tdm_native_parser:parse_frame_header(<<0:1,2:7,3:8,37:8,12:8>>)),
+	?assertEqual(H#tdm_header{opcode = 21, stream = -1}, tdm_native_parser:parse_frame_header(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>)).
 
 
 parse_frame_test() ->
-	F = #frame{header = #header{type = request, version = 2, flags = #flags{compressing = false, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
+	F = #tdm_frame{header = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = false, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
 	?assertEqual(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, tdm_native_parser:encode_frame(F, none)),
-	?assertEqual(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, tdm_native_parser:encode_frame(F#frame{body = <<1, 2, 3>>}, none)),
-	?assertEqual({F#frame{length = 0}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, none)),
-	?assertEqual({F#frame{length = 0}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer,1,2,3>>, none)),
-	?assertEqual({F#frame{length = 3, body= <<1,2,3>>}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, none)),
-	?assertEqual({F#frame{length = 3, body= <<1,2,3>>}, <<4,5>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3,4,5>>, none)).
+	?assertEqual(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<1, 2, 3>>}, none)),
+	?assertEqual({F#tdm_frame{length = 0}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, none)),
+	?assertEqual({F#tdm_frame{length = 0}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer,1,2,3>>, none)),
+	?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, none)),
+	?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<4,5>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3,4,5>>, none)).
 
 parse_simple_datatypes_test() ->
 	% int
@@ -143,37 +143,37 @@ parse_errors_test() ->
 		C = tdm_native_parser:encode_int(Code),
 		M = tdm_native_parser:encode_string(Msg),
 		B = <<C/binary, M/binary, Postfix/binary>>,
-		#frame{body = B}
+		#tdm_frame{body = B}
 	end,
-	?assertEqual(#error{error_code = ?ERR_SERVER_ERROR, message = "abcdef", type = server_error, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_SERVER_ERROR, message = "abcdef", type = server_error, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_SERVER_ERROR, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_PROTOCOL_ERROR, message = "abcdef", type = protocol_error, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_PROTOCOL_ERROR, message = "abcdef", type = protocol_error, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_PROTOCOL_ERROR, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_BAD_CREDENTIALS, message = "abcdef", type = bad_credentials, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_BAD_CREDENTIALS, message = "abcdef", type = bad_credentials, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_BAD_CREDENTIALS, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_UNAVAILABLE_EXCEPTION, message = "abcdef", type = unavailable_exception, additional_info = [{consistency_level, any}, {nodes_required, 5}, {nodes_alive, 3}]},
+	?assertEqual(#tdm_error{error_code = ?ERR_UNAVAILABLE_EXCEPTION, message = "abcdef", type = unavailable_exception, additional_info = [{consistency_level, any}, {nodes_required, 5}, {nodes_alive, 3}]},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_UNAVAILABLE_EXCEPTION, "abcdef", <<0:16,5:32,3:32>>))),
-	?assertEqual(#error{error_code = ?ERR_OVERLOADED, message = "abcdef", type = coordinator_node_is_overloaded, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_OVERLOADED, message = "abcdef", type = coordinator_node_is_overloaded, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_OVERLOADED, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_IS_BOOTSTRAPING, message = "abcdef", type = coordinator_node_is_bootstrapping, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_IS_BOOTSTRAPING, message = "abcdef", type = coordinator_node_is_bootstrapping, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_IS_BOOTSTRAPING, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_TRUNCATE_ERROR, message = "abcdef", type = truncate_error, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_TRUNCATE_ERROR, message = "abcdef", type = truncate_error, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_TRUNCATE_ERROR, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_WRITE_TIMEOUT, message = "abcdef", type = write_timeout, additional_info = [{consistency_level, one}, {nodes_received, 2}, {nodes_required, 5}, {write_type, "abc"}]},
+	?assertEqual(#tdm_error{error_code = ?ERR_WRITE_TIMEOUT, message = "abcdef", type = write_timeout, additional_info = [{consistency_level, one}, {nodes_received, 2}, {nodes_required, 5}, {write_type, "abc"}]},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_WRITE_TIMEOUT, "abcdef", <<1:16,2:32,5:32,3:16,97,98,99>>))),
-	?assertEqual(#error{error_code = ?ERR_READ_TIMEOUT, message = "abcdef", type = read_timeout, additional_info = [{consistency_level, one}, {nodes_received, 2}, {nodes_required, 5}, {data_present, true}]},
+	?assertEqual(#tdm_error{error_code = ?ERR_READ_TIMEOUT, message = "abcdef", type = read_timeout, additional_info = [{consistency_level, one}, {nodes_received, 2}, {nodes_required, 5}, {data_present, true}]},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_READ_TIMEOUT, "abcdef", <<1:16,2:32,5:32,3>>))),
-	?assertEqual(#error{error_code = ?ERR_UNATHORIZED, message = "abcdef", type = unathorized, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_UNATHORIZED, message = "abcdef", type = unathorized, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_UNATHORIZED, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_SYNTAX_ERROR, message = "abcdef", type = syntax_error, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_SYNTAX_ERROR, message = "abcdef", type = syntax_error, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_SYNTAX_ERROR, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_INVALID, message = "abcdef", type = invalid_query, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_INVALID, message = "abcdef", type = invalid_query, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_INVALID, "abcdef", <<>>))),
-	?assertEqual(#error{error_code = ?ERR_ALREADY_EXISTS, message = "abcdef", type = already_exists, additional_info = [{keyspace, "abc"},{table, "de"}]},
+	?assertEqual(#tdm_error{error_code = ?ERR_ALREADY_EXISTS, message = "abcdef", type = already_exists, additional_info = [{keyspace, "abc"},{table, "de"}]},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_ALREADY_EXISTS, "abcdef", <<3:16,97,98,99,2:16,100,101>>))),
-	?assertEqual(#error{error_code = ?ERR_UNPREPARED, message = "abcdef", type = unprepared_query, additional_info = [{query_id, <<0,1,2,3,4,5,6>>}]},
+	?assertEqual(#tdm_error{error_code = ?ERR_UNPREPARED, message = "abcdef", type = unprepared_query, additional_info = [{query_id, <<0,1,2,3,4,5,6>>}]},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_UNPREPARED, "abcdef", <<7:16,0,1,2,3,4,5,6>>))),
-	?assertEqual(#error{error_code = ?ERR_CONFIG_ERROR, message = "abcdef", type = config_error, additional_info = undefined},
+	?assertEqual(#tdm_error{error_code = ?ERR_CONFIG_ERROR, message = "abcdef", type = config_error, additional_info = undefined},
 		tdm_native_parser:parse_error(MkTestCode(?ERR_CONFIG_ERROR, "abcdef", <<>>))).
 
 parse_metadata_test() ->
@@ -188,39 +188,39 @@ parse_metadata_test() ->
 	ok.
 
 parse_row_test() ->
-	F = #frame{header = #header{type = request, version = 2, flags = #flags{compressing = true, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
-	?assertEqual(ok, tdm_native_parser:parse_result(F#frame{body = <<?RES_VOID:32>>})),
-	?assertEqual({keyspace, "abc"}, tdm_native_parser:parse_result(F#frame{body = <<?RES_KEYSPACE:32,3:16,97,98,99>>})),
-	?assertEqual({created, "Abc", "Def"}, tdm_native_parser:parse_result(F#frame{body = <<?RES_SCHEMA:32,7:16,"CREATED",3:16,"Abc",3:16,"Def">>})),
-	?assertEqual({updated, "Abc", "Def"}, tdm_native_parser:parse_result(F#frame{body = <<?RES_SCHEMA:32,7:16,"UPDATED",3:16,"Abc",3:16,"Def">>})),
-	?assertEqual({dropped, "Abc", "Def"}, tdm_native_parser:parse_result(F#frame{body = <<?RES_SCHEMA:32,7:16,"DROPPED",3:16,"Abc",3:16,"Def">>})),
+	F = #tdm_frame{header = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
+	?assertEqual(ok, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_VOID:32>>})),
+	?assertEqual({keyspace, "abc"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_KEYSPACE:32,3:16,97,98,99>>})),
+	?assertEqual({created, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"CREATED",3:16,"Abc",3:16,"Def">>})),
+	?assertEqual({updated, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"UPDATED",3:16,"Abc",3:16,"Def">>})),
+	?assertEqual({dropped, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"DROPPED",3:16,"Abc",3:16,"Def">>})),
 	M = <<1:32,3:32, 3:16,"abc", 2:16,"de", 1:16,"a",2:16, 2:16,"bc",4:16, 3:16,"def",1:16>>,
 	R = <<3:32, 4:32,1:32,1:32,1:8,4:32,"abcd", 4:32,2:32,1:32,1:8,4:32,"efgh", 4:32,3:32,1:32,0:8,4:32,"klmn">>, %%
 	?assertEqual({[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined,
 	              [[1, true, "abcd"], [2, true, "efgh"], [3, false, "klmn"]]},
-		            tdm_native_parser:parse_result(F#frame{body = <<?RES_ROWS:32,M/binary,R/binary>>})),
-	?assertEqual({<<1,2,3>>, {[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined}, undefined}, tdm_native_parser:parse_result(F#frame{body = <<?RES_PREPARED:32,3:16,1,2,3,M/binary>>})),
+		            tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_ROWS:32,M/binary,R/binary>>})),
+	?assertEqual({<<1,2,3>>, {[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined}, undefined}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_PREPARED:32,3:16,1,2,3,M/binary>>})),
 	ok.
 
 parse_event_test() ->
-	F = #frame{header = #header{type = response, version = 2, flags = #flags{compressing = true, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
-	?assertEqual({topology_change, new_node, "localhost"}, tdm_native_parser:parse_event(F#frame{body = <<15:16,"TOPOLOGY_CHANGE", 8:16,"NEW_NODE", 9:16,"localhost">>})),
-	?assertEqual({topology_change, removed_node, "localhost"}, tdm_native_parser:parse_event(F#frame{body = <<15:16,"TOPOLOGY_CHANGE", 12:16,"REMOVED_NODE", 9:16,"localhost">>})),
-	?assertEqual({status_change, node_up, "localhost"}, tdm_native_parser:parse_event(F#frame{body = <<13:16,"STATUS_CHANGE", 2:16,"UP", 9:16,"localhost">>})),
-	?assertEqual({status_change, node_down, "localhost"}, tdm_native_parser:parse_event(F#frame{body = <<13:16,"STATUS_CHANGE", 4:16,"DOWN", 9:16,"localhost">>})),
-	?assertEqual({schema_change, created, "KS", "Test"}, tdm_native_parser:parse_event(F#frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"CREATED", 2:16,"KS", 4:16,"Test">>})),
-	?assertEqual({schema_change, updated, "KS", "Test"}, tdm_native_parser:parse_event(F#frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"UPDATED", 2:16,"KS", 4:16,"Test">>})),
-	?assertEqual({schema_change, dropped, "KS", "Test"}, tdm_native_parser:parse_event(F#frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"DROPPED", 2:16,"KS", 4:16,"Test">>})),
+	F = #tdm_frame{header = #tdm_header{type = response, version = 2, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
+	?assertEqual({topology_change, new_node, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<15:16,"TOPOLOGY_CHANGE", 8:16,"NEW_NODE", 9:16,"localhost">>})),
+	?assertEqual({topology_change, removed_node, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<15:16,"TOPOLOGY_CHANGE", 12:16,"REMOVED_NODE", 9:16,"localhost">>})),
+	?assertEqual({status_change, node_up, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"STATUS_CHANGE", 2:16,"UP", 9:16,"localhost">>})),
+	?assertEqual({status_change, node_down, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"STATUS_CHANGE", 4:16,"DOWN", 9:16,"localhost">>})),
+	?assertEqual({schema_change, created, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"CREATED", 2:16,"KS", 4:16,"Test">>})),
+	?assertEqual({schema_change, updated, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"UPDATED", 2:16,"KS", 4:16,"Test">>})),
+	?assertEqual({schema_change, dropped, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"DROPPED", 2:16,"KS", 4:16,"Test">>})),
 	ok.
 
 encode_query_flags_test() ->
-	?assertEqual(<<31>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [1,2,3], consistency_level = one, page_size = 23, paging_state = <<1,2,3>>, serial_consistency = one, skip_metadata = true})),
-	?assertEqual(<<30>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [], consistency_level = one, page_size = 23, paging_state = <<1,2,3>>, serial_consistency = one, skip_metadata = true})),
-	?assertEqual(<<23>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [1,2,3], consistency_level = one, page_size = 23, paging_state = undefined, serial_consistency = one, skip_metadata = true})),
-	?assertEqual(<<19>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = one, skip_metadata = true})),
-	?assertEqual(<<17>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = one, skip_metadata = false})),
-	?assertEqual(<<1>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency =  undefined, skip_metadata = false})),
-	?assertEqual(<<0>>, tdm_native_parser:encode_query_flags(#query_params{bind_values = [], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = undefined, skip_metadata = false})),
+	?assertEqual(<<31>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [1,2,3], consistency_level = one, page_size = 23, paging_state = <<1,2,3>>, serial_consistency = one, skip_metadata = true})),
+	?assertEqual(<<30>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [], consistency_level = one, page_size = 23, paging_state = <<1,2,3>>, serial_consistency = one, skip_metadata = true})),
+	?assertEqual(<<23>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [1,2,3], consistency_level = one, page_size = 23, paging_state = undefined, serial_consistency = one, skip_metadata = true})),
+	?assertEqual(<<19>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = one, skip_metadata = true})),
+	?assertEqual(<<17>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = one, skip_metadata = false})),
+	?assertEqual(<<1>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [1,2,3], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency =  undefined, skip_metadata = false})),
+	?assertEqual(<<0>>, tdm_native_parser:encode_query_flags(#tdm_query_params{bind_values = [], consistency_level = one, page_size = undefined, paging_state = undefined, serial_consistency = undefined, skip_metadata = false})),
 	ok.
 
 assert_equal_binary(B1, B2) ->
@@ -232,25 +232,25 @@ assert_equal_binary(B1, B2) ->
 	end.
 
 encode_query_params_test() ->
-	P = #query_params{consistency_level = one, page_size = 16, paging_state = <<0,1,2>>, serial_consistency = one, skip_metadata = false, bind_values = [{bigint, 3}, {ascii, "abc"}]},
+	P = #tdm_query_params{consistency_level = one, page_size = 16, paging_state = <<0,1,2>>, serial_consistency = one, skip_metadata = false, bind_values = [{bigint, 3}, {ascii, "abc"}]},
 	assert_equal_binary(<<1:16,29:8,2:16, 8:32,3:64, 3:32,"abc", 16:32, 3:32,0,1,2, 1:16>>, tdm_native_parser:encode_query_params(P)),
-	assert_equal_binary(<<1:16,21:8,2:16, 8:32,3:64, 3:32,"abc", 16:32, 1:16>>, tdm_native_parser:encode_query_params(P#query_params{paging_state = undefined})),
-	assert_equal_binary(<<1:16,17:8,2:16, 8:32,3:64, 3:32,"abc", 1:16>>, tdm_native_parser:encode_query_params(P#query_params{paging_state = undefined, page_size = undefined})),
-	assert_equal_binary(<<1:16,1:8,2:16, 8:32,3:64, 3:32,"abc">>, tdm_native_parser:encode_query_params(P#query_params{paging_state = undefined, page_size = undefined, serial_consistency = undefined})),
+	assert_equal_binary(<<1:16,21:8,2:16, 8:32,3:64, 3:32,"abc", 16:32, 1:16>>, tdm_native_parser:encode_query_params(P#tdm_query_params{paging_state = undefined})),
+	assert_equal_binary(<<1:16,17:8,2:16, 8:32,3:64, 3:32,"abc", 1:16>>, tdm_native_parser:encode_query_params(P#tdm_query_params{paging_state = undefined, page_size = undefined})),
+	assert_equal_binary(<<1:16,1:8,2:16, 8:32,3:64, 3:32,"abc">>, tdm_native_parser:encode_query_params(P#tdm_query_params{paging_state = undefined, page_size = undefined, serial_consistency = undefined})),
 	ok.
 
 encode_query_test() ->
-	P = #query_params{bind_values = [{ascii, "ks_info"}]},
+	P = #tdm_query_params{bind_values = [{ascii, "ks_info"}]},
 	assert_equal_binary(<<52:32, "SELECT * from system.schema_keyspaces WHERE name = ?", 4:16, 1:8, 1:16, 7:32,"ks_info">>, tdm_native_parser:encode_query("SELECT * from system.schema_keyspaces WHERE name = ?", P)),
 	assert_equal_binary(<<3:16,1,2,3, 4:16, 1:8, 1:16, 7:32,"ks_info">>, tdm_native_parser:encode_query(<<1,2,3>>, P)),
 	ok.
 
 encode_batch_query_test() ->
 %% 	todo:
-	B = #batch_query{batch_type = logged, consistency_level = one, queries = [{"SELECT * from system.schema_keyspaces WHERE name = ?", [{ascii, "ks_info"}]}, {<<1,2,3>>, [{ascii, "ks_info"}]}]},
+	B = #tdm_batch_query{batch_type = logged, consistency_level = one, queries = [{"SELECT * from system.schema_keyspaces WHERE name = ?", [{ascii, "ks_info"}]}, {<<1,2,3>>, [{ascii, "ks_info"}]}]},
 	assert_equal_binary(<<0, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B)),
-	assert_equal_binary(<<1, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#batch_query{batch_type = unlogged})),
-	assert_equal_binary(<<2, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#batch_query{batch_type = counter})),
+	assert_equal_binary(<<1, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = unlogged})),
+	assert_equal_binary(<<2, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = counter})),
 	ok.
 
 
@@ -261,12 +261,12 @@ dummy_unzip(<<1,2,3,Body/binary>>) ->
 	Body.
 
 compression_test() ->
-	Flags = #flags{compressing = true, tracing = false},
-	Header = #header{type = request, version = 2, flags = Flags, opcode = 12, stream = 37},
-	F = #frame{header = Header, body = <<>>},
+	Flags = #tdm_flags{compressing = true, tracing = false},
+	Header = #tdm_header{type = request, version = 2, flags = Flags, opcode = 12, stream = 37},
+	F = #tdm_frame{header = Header, body = <<>>},
 	C = {"test", {native_parser_test, dummy_zip, dummy_unzip}, 3},
 	?assertEqual(<<0:1,2:7,1:8,37:8,12:8,0:32>>, tdm_native_parser:encode_frame(F, C)),
-	?assertEqual(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7>>, tdm_native_parser:encode_frame(F#frame{body = <<4,5,6,7>>}, C)),
-	?assertEqual({F#frame{length = 0, header = Header#header{flags = Flags#flags{compressing = false}}}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, C)),
-	?assertEqual({F#frame{length = 4, header = Header#header{flags = Flags#flags{compressing = false}}, body = <<4,5,6,7>>}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7,1,2,3>>, C)),
+	?assertEqual(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<4,5,6,7>>}, C)),
+	?assertEqual({F#tdm_frame{length = 0, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, C)),
+	?assertEqual({F#tdm_frame{length = 4, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}, body = <<4,5,6,7>>}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7,1,2,3>>, C)),
 	ok.

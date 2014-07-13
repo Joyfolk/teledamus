@@ -14,10 +14,10 @@
 -export([encode_event_types/1]).
 
 parse_frame_header(<<Type:1, Version:7/big-unsigned-integer, Flags:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>) ->
-	#header{type = parse_type(Type), version = Version, flags = parse_flags(Flags), stream = Stream, opcode = OpCode}.
+	#tdm_header{type = parse_type(Type), version = Version, flags = parse_flags(Flags), stream = Stream, opcode = OpCode}.
 
 
-encode_frame_header(#header{type = Type, version = Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
+encode_frame_header(#tdm_header{type = Type, version = Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
 	F = encode_flags(Flags),
 	T = encode_type(Type),
 	<<T:1, Version:7/big-unsigned-integer, F:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>.
@@ -35,25 +35,25 @@ encode_boolean(false) -> 0;
 encode_boolean(true) -> 1.
 
 parse_flags(<<_N:6, Tracing:1, Compressing:1>>) ->
-	#flags{tracing = parse_boolean(Tracing), compressing = parse_boolean(Compressing)}.
+	#tdm_flags{tracing = parse_boolean(Tracing), compressing = parse_boolean(Compressing)}.
 
-encode_flags(#flags{compressing = Compressing, tracing = Tracing}) ->
+encode_flags(#tdm_flags{compressing = Compressing, tracing = Tracing}) ->
 	T = encode_boolean(Tracing),
 	C = encode_boolean(Compressing),
 	<<0:6,T:1,C:1>>.
 
-is_compressed(#frame{header = #header{flags = #flags{compressing = Compressed}}}) -> Compressed.
+is_compressed(#tdm_frame{header = #tdm_header{flags = #tdm_flags{compressing = Compressed}}}) -> Compressed.
 
 decompress_if_needed(Frame, Compression) ->
 	case is_compressed(Frame) of
 		true ->
 			case Compression of
 				{_Name, {M, _CF, DF}, _} ->
-					Body = M:DF(Frame#frame.body),
+					Body = M:DF(Frame#tdm_frame.body),
 					Length = iolist_size(Body),
-					Header = Frame#frame.header,
-					Flags = Header#header.flags,
-					Frame#frame{body = Body, length = Length, header = Header#header{flags = Flags#flags{compressing = false}}};
+					Header = Frame#tdm_frame.header,
+					Flags = Header#tdm_header.flags,
+					Frame#tdm_frame{body = Body, length = Length, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}};
 				_ ->
 					throw({unsupported_compression_type, Compression})
 			end;
@@ -66,11 +66,11 @@ compress_if_needed(Frame, Compression) ->
 		none ->
 			Frame;
 		{_Name, {M, CF, _DF}, Threshold} ->
-			case iolist_size(Frame#frame.body) > Threshold of
+			case iolist_size(Frame#tdm_frame.body) > Threshold of
 				true ->
-					Header = Frame#frame.header,
-					Flags = Header#header.flags,
-					Frame#frame{body = M:CF(Frame#frame.body), header = (Frame#frame.header)#header{flags = Flags#flags{compressing = true}}};
+					Header = Frame#tdm_frame.header,
+					Flags = Header#tdm_header.flags,
+					Frame#tdm_frame{body = M:CF(Frame#tdm_frame.body), header = (Frame#tdm_frame.header)#tdm_header{flags = Flags#tdm_flags{compressing = true}}};
 				_ ->
 					Frame
 			end;
@@ -80,13 +80,13 @@ compress_if_needed(Frame, Compression) ->
 
 parse_frame(<<Header:4/binary, Length:32/big-unsigned-integer, Body:Length/binary, Rest/binary>>, Compression) ->
   H = parse_frame_header(Header),
-	F = #frame{header = H, length = Length, body = Body},
-  #flags{tracing = IsTracing} = H#header.flags,
+	F = #tdm_frame{header = H, length = Length, body = Body},
+  #tdm_flags{tracing = IsTracing} = H#tdm_header.flags,
   case IsTracing of
     true ->
       {TracingId, Body2} = parse_uuid(decompress_if_needed(F, Compression)),
       error_logger:info_msg("TracingId = ~p", [TracingId]),
-      {F#frame{body = Body2}, Rest};
+      {F#tdm_frame{body = Body2}, Rest};
     false ->
       {decompress_if_needed(F, Compression), Rest}
   end;
@@ -95,7 +95,7 @@ parse_frame(<<Rest/binary>>, _Compressing) ->
 
 encode_frame(Frame, Compression) ->
 	F = compress_if_needed(Frame, Compression),
-	#frame{header = Header, body = Body} = F,
+	#tdm_frame{header = Header, body = Body} = F,
 	Length = iolist_size(Body),
 	if
 		Length > ?MAX_BODY_LENGTH -> throw(body_size_too_long);
@@ -364,61 +364,61 @@ encode_string_pair_with_list({K, V}) ->
 	<<BK/binary, BV/binary>>.
 
 
-parse_error(#frame{body = Body}) ->
+parse_error(#tdm_frame{body = Body}) ->
 	{Code, X0} = parse_int(Body),
 	{Message, X1} = parse_string(X0),
-	Error = #error{error_code = Code, message = Message},
+	Error = #tdm_error{error_code = Code, message = Message},
 	case Code of
 		?ERR_SERVER_ERROR ->
-			Error#error{type = server_error};
+			Error#tdm_error{type = server_error};
 		?ERR_PROTOCOL_ERROR ->
-			Error#error{type = protocol_error};
+			Error#tdm_error{type = protocol_error};
 		?ERR_BAD_CREDENTIALS ->
-			Error#error{type = bad_credentials};
+			Error#tdm_error{type = bad_credentials};
 		?ERR_UNAVAILABLE_EXCEPTION ->
 			{CL, XC0} = parse_consistency_level(X1),
 			{Required, XC1} = parse_int(XC0),
 			{Alive, _XC2} = parse_int(XC1),
-			Error#error{type = unavailable_exception, additional_info = [{consistency_level, CL}, {nodes_required, Required}, {nodes_alive, Alive}]};
+			Error#tdm_error{type = unavailable_exception, additional_info = [{consistency_level, CL}, {nodes_required, Required}, {nodes_alive, Alive}]};
 		?ERR_OVERLOADED ->
-			Error#error{type = coordinator_node_is_overloaded};
+			Error#tdm_error{type = coordinator_node_is_overloaded};
 		?ERR_IS_BOOTSTRAPING ->
-			Error#error{type = coordinator_node_is_bootstrapping};
+			Error#tdm_error{type = coordinator_node_is_bootstrapping};
 		?ERR_TRUNCATE_ERROR ->
-			Error#error{type = truncate_error};
+			Error#tdm_error{type = truncate_error};
 		?ERR_WRITE_TIMEOUT ->
 			{CL, XT0} = parse_consistency_level(X1),
 			{Received, XT1} = parse_int(XT0),
 			{BlockFor, XT2} = parse_int(XT1),
 			{WriteType, _XT3} = parse_string(XT2),
-			Error#error{type = write_timeout, additional_info = [{consistency_level, CL}, {nodes_received, Received}, {nodes_required, BlockFor}, {write_type, WriteType}]};
+			Error#tdm_error{type = write_timeout, additional_info = [{consistency_level, CL}, {nodes_received, Received}, {nodes_required, BlockFor}, {write_type, WriteType}]};
 		?ERR_READ_TIMEOUT ->
 			{CL, XT0} = parse_consistency_level(X1),
 			{Received, XT1} = parse_int(XT0),
 			{BlockFor, XT2} = parse_int(XT1),
 			{DataPresent, _XT3} = parse_byte(XT2),
 			DP = if DataPresent =:= 0 -> false; true -> true end,
-			Error#error{type = read_timeout, additional_info = [{consistency_level, CL}, {nodes_received, Received}, {nodes_required, BlockFor}, {data_present, DP}]};
+			Error#tdm_error{type = read_timeout, additional_info = [{consistency_level, CL}, {nodes_received, Received}, {nodes_required, BlockFor}, {data_present, DP}]};
 		?ERR_SYNTAX_ERROR ->
-			Error#error{type = syntax_error};
+			Error#tdm_error{type = syntax_error};
 		?ERR_UNATHORIZED ->
-			Error#error{type = unathorized};
+			Error#tdm_error{type = unathorized};
 		?ERR_INVALID ->
-			Error#error{type = invalid_query};
+			Error#tdm_error{type = invalid_query};
 		?ERR_CONFIG_ERROR ->
-			Error#error{type = config_error};
+			Error#tdm_error{type = config_error};
 		?ERR_ALREADY_EXISTS ->
 			{Keyspace, XE0} = parse_string(X1),
 			{Table, _XE1} = parse_string(XE0),
-			Error#error{type = already_exists, additional_info = [{keyspace, Keyspace}, {table, Table}]};
+			Error#tdm_error{type = already_exists, additional_info = [{keyspace, Keyspace}, {table, Table}]};
 		?ERR_UNPREPARED ->
 			{ID, _X2} = parse_short_bytes(X1),
-			Error#error{type = unprepared_query, additional_info = [{query_id, ID}]};
+			Error#tdm_error{type = unprepared_query, additional_info = [{query_id, ID}]};
 		_ ->
 			Error
 	end.
 
-parse_result(#frame{body = Body}) ->
+parse_result(#tdm_frame{body = Body}) ->
 	{Kind, X0} = parse_int(Body),
 	case Kind of
 		?RES_VOID ->
@@ -542,7 +542,7 @@ encode_event_types(EventTypes) ->
 		end
 	end, EventTypes)).
 
-parse_event(#frame{body = Body}) ->
+parse_event(#tdm_frame{body = Body}) ->
 	{EventType, X0} = parse_string(Body),
 	case EventType of
 		"TOPOLOGY_CHANGE" ->
@@ -585,7 +585,7 @@ parse_event(#frame{body = Body}) ->
 			{unknown_event_type, EventType, Body}
 	end.
 
-encode_query_flags(#query_params{bind_values = Bind, skip_metadata = SkipMetadata, page_size = PageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
+encode_query_flags(#tdm_query_params{bind_values = Bind, skip_metadata = SkipMetadata, page_size = PageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
 	F0 = case Bind of
 				 undefined -> 0;
 				 [] -> 0;
@@ -598,7 +598,7 @@ encode_query_flags(#query_params{bind_values = Bind, skip_metadata = SkipMetadat
 	<<(F0 bor F1 bor F2 bor F3 bor F4):8/big-unsigned-integer>>.
 
 
-encode_query_params(Params = #query_params{consistency_level = Consistency, bind_values = Bind, page_size = ResultPageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
+encode_query_params(Params = #tdm_query_params{consistency_level = Consistency, bind_values = Bind, page_size = ResultPageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
 	CL = encode_consistency_level(Consistency),
 	Flags = encode_query_flags(Params),
 	Vars = encode_values(Bind),
@@ -617,7 +617,7 @@ encode_batch_type(BatchType) ->
 			end,
 	encode_byte(R).
 
-encode_batch_query(#batch_query{batch_type = BatchType, queries = Queries, consistency_level = Consistency}) ->
+encode_batch_query(#tdm_batch_query{batch_type = BatchType, queries = Queries, consistency_level = Consistency}) ->
 	BT = encode_batch_type(BatchType),
 	QC = encode_short(length(Queries)),
 	QL = list_to_binary(lists:map(fun encode_single_query/1, Queries)),
@@ -642,7 +642,7 @@ encode_values(BindValues) ->
 	<<N/binary,V/binary>>.
 
 
--spec encode_query(binary() | string(), #query_params{}) -> binary().
+-spec encode_query(binary() | string(), #tdm_query_params{}) -> binary().
 encode_query(Query, Params) when is_list(Query) ->
 	Q = encode_long_string(Query),
 	P = encode_query_params(Params),

@@ -50,25 +50,25 @@ query_async(Stream, Query, Params, ReplyTo) ->
     cast(Stream, {query, Query, Params}, ReplyTo).
 
 -spec query(Stream :: stream(), Query :: string(), Params :: query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error() | result_rows() | schema_change().
-query(Stream = #stream{connection = Con}, Query, Params, Timeout, UseCache) ->
+query(Stream = #tdm_stream{connection = Con}, Query, Params, Timeout, UseCache) ->
     case UseCache of
         true ->
             case tdm_stmt_cache:cache(Query, Con, Timeout) of
                 {ok, Id} -> call(Stream, {execute, Id, Params}, Timeout);
-                Err = #error{} -> Err
+                Err = #tdm_error{} -> Err
             end;
         false ->
             call(Stream, {query, Query, Params}, Timeout)
     end.
 
 -spec query_async(Stream :: stream(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
-query_async(Stream = #stream{connection = Con}, Query, Params, ReplyTo, UseCache) ->
+query_async(Stream = #tdm_stream{connection = Con}, Query, Params, ReplyTo, UseCache) ->
     case UseCache of
         true ->
             tdm_stmt_cache:cache_async(Query, Con, fun(Res) ->
                 case Res of
                     {ok, Id} -> cast(Stream, {execute, Id, Params}, ReplyTo);
-                    Err = #error{} -> Err
+                    Err = #tdm_error{} -> Err
                 end
             end);
         false ->
@@ -125,10 +125,10 @@ batch_query_async(Stream, Batch, ReplyTo) ->
     cast(Stream, {batch, Batch}, ReplyTo).
 
 -spec batch_query(Stream :: stream(), Batch :: batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error().
-batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, Timeout, UseCache) ->
+batch_query(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_query{queries = Queries}, Timeout, UseCache) ->
     case UseCache of
         true ->
-            NBatch = Batch#batch_query{queries = lists:map(
+            NBatch = Batch#tdm_batch_query{queries = lists:map(
                 fun({Id, Args}) when is_binary(Id) ->
                     {Id, Args};
                    ({Query, Args}) when is_list(Query) ->
@@ -148,7 +148,7 @@ batch_query(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Q
 -spec batch_query_async(Stream :: stream(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> timeout | ok.
 batch_query_async(Stream, Batch, ReplyTo, false) ->
     batch_query_async(Stream, Batch, ReplyTo);
-batch_query_async(Stream = #stream{connection = Con}, Batch = #batch_query{queries = Queries}, ReplyTo, true) ->
+batch_query_async(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_query{queries = Queries}, ReplyTo, true) ->
     ToCache = lists:filter(fun({Q, _Args}) -> is_list(Q) end, Queries),
     tdm_stmt_cache:cache_async_multple(ToCache, Con, fun(Dict) ->
         Qs = lists:map(fun({Q, Arg}) ->
@@ -157,7 +157,7 @@ batch_query_async(Stream = #stream{connection = Con}, Batch = #batch_query{queri
                 true -> {dict:fetch(Q, Dict), Arg}
             end
         end, Queries),
-        cast(Stream, {batch, Batch#batch_query{queries = Qs}}, ReplyTo)
+        cast(Stream, {batch, Batch#tdm_batch_query{queries = Qs}}, ReplyTo)
     end).
 
 -spec subscribe_events(Stream :: stream(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | error().
@@ -168,17 +168,17 @@ subscribe_events(Stream, EventTypes, Timeout) ->
 subscribe_events_async(Stream, EventTypes, ReplyTo) ->
     cast(Stream, {register, EventTypes}, ReplyTo).
 
-from_cache(#stream{connection = #connection{host = Host, port = Port}}, Query) ->
+from_cache(#tdm_stream{connection = #tdm_connection{host = Host, port = Port}}, Query) ->
     tdm_stmt_cache:from_cache({Host, Port, Query}).
 
-to_cache(#stream{connection = #connection{host = Host, port = Port}}, Query, Id) ->
+to_cache(#tdm_stream{connection = #tdm_connection{host = Host, port = Port}}, Query, Id) ->
     tdm_stmt_cache:to_cache({Host, Port, Query}, Id).
 
 
 
 init(Connection, StreamId, Compression, ChannelMonitor) ->
     proc_lib:init_ack({ok, self()}),
-    erlang:monitor(process, Connection#connection.pid),
+    erlang:monitor(process, Connection#tdm_connection.pid),
     loop(#state{connection = Connection, id = StreamId, compression = Compression, channel_monitor = ChannelMonitor}).
 
 loop(State) ->
@@ -219,7 +219,7 @@ reply_if_needed(Caller, Reply, ChannelMonitor) ->
     end.
 
 
-handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid = Connection}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor}) ->
+handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection{pid = Connection}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor}) ->
     case Request of
         {call, From, Msg} ->
             case ChannelMonitor of
@@ -231,38 +231,38 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
                     {stop, State};
 
                 options ->
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {query, Query, Params} ->
                     Body = tdm_native_parser:encode_query(Query, Params),
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {prepare, Query} ->
                     Body = tdm_native_parser:encode_long_string(Query),
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {execute, ID, Params} ->
                     Body = tdm_native_parser:encode_query(ID, Params),
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {batch, BatchQuery} ->
                     Body = tdm_native_parser:encode_batch_query(BatchQuery),
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {register, EventTypes} ->
                     start_gen_event_if_required(),
                     Body = tdm_native_parser:encode_event_types(EventTypes),
-                    Frame = #frame{header = #header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
+                    Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
                     tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
@@ -273,7 +273,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
             end;
 
         {handle_frame, Frame} ->
-            OpCode = (Frame#frame.header)#header.opcode,
+            OpCode = (Frame#tdm_frame.header)#tdm_header.opcode,
             case OpCode of
                 ?OPC_ERROR ->
                     Error = tdm_native_parser:parse_error(Frame),
@@ -287,7 +287,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #connection{pid
                     throw({not_supported_option, authentificate}),
                     {noreply, State};
                 ?OPC_SUPPORTED ->
-                    {Options, _} = tdm_native_parser:parse_string_multimap(Frame#frame.body),
+                    {Options, _} = tdm_native_parser:parse_string_multimap(Frame#tdm_frame.body),
                     reply_if_needed(Caller, Options, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_RESULT ->
@@ -314,7 +314,7 @@ start_gen_event_if_required() ->
     end.
 
 
-call(#stream{stream_pid = Pid}, Msg, Timeout) ->
+call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
     try erlang:monitor(process, Pid) of
         Mref ->
             Tag = {self(), Mref},
@@ -336,7 +336,7 @@ call(#stream{stream_pid = Pid}, Msg, Timeout) ->
             {error, Reason}
     end.
 
-cast(#stream{stream_pid = Pid}, Msg, AsyncTarget) ->
+cast(#tdm_stream{stream_pid = Pid}, Msg, AsyncTarget) ->
     try
         ok = erlang:send(Pid, {call, AsyncTarget, Msg}, [noconnect])
     catch

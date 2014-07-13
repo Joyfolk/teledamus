@@ -50,13 +50,13 @@ collections_test(N, M, P) ->
   Spl = split_N(Vals, P, []),
   T0 = millis(),
   lists:foreach(fun(X) ->
-      teledamus:execute_query(Con, Q, #query_params{consistency_level = one, bind_values = [{int, X}, {int, 1}, {{set, varchar}, Vals}]}, 1000)
+      teledamus:execute_query(Con, Q, #tdm_query_params{consistency_level = one, bind_values = [{int, X}, {int, 1}, {{set, varchar}, Vals}]}, 1000)
   end, lists:seq(1, N)),
   T1 = millis(),
   TS = lists:map(fun(J) ->
       T = millis(),
       lists:foreach(fun(L) ->
-          ok = teledamus:execute_query(Con, Q2, #query_params{consistency_level = quorum, bind_values = [{{set, varchar}, L}, {int, J}, {int, 1}]}, 1000)
+          ok = teledamus:execute_query(Con, Q2, #tdm_query_params{consistency_level = quorum, bind_values = [{{set, varchar}, L}, {int, J}, {int, 1}]}, 1000)
       end, Spl),
       millis() - T
   end, lists:seq(1, N)),
@@ -109,7 +109,7 @@ counter_test_int(_, _, 0) ->
 counter_test_int(Con, Q, N) ->
   T0 = millis(),
   R = try
-    teledamus:execute_query(Con, Q, #query_params{consistency_level = one}, 1000),
+    teledamus:execute_query(Con, Q, #tdm_query_params{consistency_level = one}, 1000),
     millis()
   catch
     E: EE ->
@@ -279,10 +279,10 @@ p(Str, Id, Count) -> {varchar, Str ++ integer_to_list(Id) ++ "_" ++ integer_to_l
 
 mk_batch_query(Stmt, L) ->
   QS = lists:map(fun(P) ->
-    #query_params{bind_values = VS} = P,
+    #tdm_query_params{bind_values = VS} = P,
     {Stmt, VS}
   end, L),
-  #batch_query{batch_type = ?BATCH_UNLOGGED, consistency_level = one, queries = QS}.
+  #tdm_batch_query{batch_type = ?BATCH_UNLOGGED, consistency_level = one, queries = QS}.
 
 load_test_int_batch(_Con, _PrepStmt, [], _BatchSize) -> 0;
 load_test_int_batch(Con, PrepStmt, L, BatchSize) ->
@@ -327,7 +327,7 @@ millis() ->
 
 
 for_id(Count, Id) ->
-  lists:map(fun(X) -> #query_params{consistency_level = one, bind_values = [p("s_id_", Id, X), p("c_id_", Id, X), p("v_id_", Id, X), p("o_id_", Id, X)]} end, lists:seq(1, Count)).
+  lists:map(fun(X) -> #tdm_query_params{consistency_level = one, bind_values = [p("s_id_", Id, X), p("c_id_", Id, X), p("v_id_", Id, X), p("o_id_", Id, X)]} end, lists:seq(1, Count)).
 
 prepare_data(Count, Parts) ->
 	lists:map(fun(Id) -> for_id(Count, Id) end, lists:seq(1, Parts)).

@@ -44,12 +44,12 @@ start_link(Args) ->
 	end,
 	Opts = prepare_transport(Transport, Args),
 	Init = fun() ->
-		#rr_state{resources = Nodes, rr = Nodes}
+		#tdm_rr_state{resources = Nodes, rr = Nodes}
 	end,
 	Compression = proplists:get_value(compression, Args, none),
   tdm_stmt_cache:init(),
 	tdm_connection:prepare_ets(),
-	gen_server:start_link({local, ?MODULE}, ?MODULE, [#rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor], []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [#tdm_rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor], []).
 
 prepare_transport(gen_tcp, Args) ->
 	proplists:get_value(tcp_opts, Args, []);
@@ -110,8 +110,8 @@ handle_call(Request, From, State) ->
                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
                   {ok, Pid} = tdm_connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor),
-									DefStream = tdm_connection:get_default_stream(#connection{pid = Pid}),
-                  Connection = #connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
+									DefStream = tdm_connection:get_default_stream(#tdm_connection{pid = Pid}),
+                  Connection = #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
                   ok = Transport:controlling_process(Socket, Pid),
                   gen_server:reply(From, Connection);
                 {error, Reason} ->
@@ -127,7 +127,7 @@ handle_call(Request, From, State) ->
 			end;
 
 		{release_connection, Connection} ->
-      #connection{pid = Pid} = Connection,
+      #tdm_connection{pid = Pid} = Connection,
 			case is_process_alive(Pid) of
 				true ->
 					Socket = tdm_connection:get_socket(Connection),

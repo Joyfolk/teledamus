@@ -55,7 +55,7 @@ from_cache(Key) ->
 %% @end
 -spec cache(list(), connection(), timeout()) -> {ok, binary()} | error().
 cache(Query, Con, Timeout) ->
-  #connection{host = Host, port = Port} = Con,
+  #tdm_connection{host = Host, port = Port} = Con,
   case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
 		[{_, Id}] ->
 			{ok, Id};
@@ -64,14 +64,14 @@ cache(Query, Con, Timeout) ->
         {PreparedStmtId, _, _} ->
           ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),
           {ok, PreparedStmtId};
-        Err = #error{} ->
+        Err = #tdm_error{} ->
           Err
       end
   end.
 
 -spec cache_async(Query :: string(), Con :: connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
 cache_async(Query, Con, ReplyTo) ->
-	#connection{host = Host, port = Port} = Con,
+	#tdm_connection{host = Host, port = Port} = Con,
 	case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
 		[{_, Id}] ->
 			{ok, Id};
@@ -81,7 +81,7 @@ cache_async(Query, Con, ReplyTo) ->
 					{PreparedStmtId, _, _} ->
 						ets:insert(?STMT_CACHE, {{Host, Port, Query}, PreparedStmtId}),
 						ReplyTo({ok, PreparedStmtId});
-					Err = #error{} ->
+					Err = #tdm_error{} ->
 						ReplyTo(Err)
 				end
 			end)
@@ -94,7 +94,7 @@ cache_async_multple(ToCache, Con, ReplyTo) ->
 cache_async_multple([], _Con, ReplyTo, Dict) ->
 	ReplyTo(Dict);
 cache_async_multple([Q | T], Con, ReplyTo, Dict) ->
-	#connection{host = Host, port = Port} = Con,
+	#tdm_connection{host = Host, port = Port} = Con,
 	case dict:find(Q, Dict) of
 		{ok, _Id} ->
 			cache_async_multple(T, Con, ReplyTo, Dict);
@@ -104,7 +104,7 @@ cache_async_multple([Q | T], Con, ReplyTo, Dict) ->
 					{PreparedStmtId, _, _} ->
 						ets:insert(?STMT_CACHE, {{Host, Port, Q}, PreparedStmtId}),
 						cache_async_multple(T, Con, ReplyTo, dict:store(Q, PreparedStmtId, Dict));
-				  Err = #error{} ->
+				  Err = #tdm_error{} ->
 						ReplyTo(Err)
 				end
 	    end)

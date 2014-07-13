@@ -244,24 +244,24 @@ decode_decimal(Data) ->
   <<Scale:32/big-signed-integer, Value/binary>> = Data,
   L = byte_size(Value) * 8,
   <<V:L/big-signed-integer>> = Value,
-  #decimal{scale = Scale, value = V}.
+  #tdm_decimal{scale = Scale, value = V}.
 
 -spec encode_decimal(big_decimal()) -> {binary()}.
-encode_decimal(#decimal{scale = Scale, value = Value}) ->
+encode_decimal(#tdm_decimal{scale = Scale, value = Value}) ->
 	L = int_size(Value) * 8,
   <<Scale:32/big-signed-integer, Value:L/big-signed-integer>>.
 
 -spec decode_inet(binary()) -> inet().
 decode_inet(<<A:8/big-unsigned-integer, B:8/big-unsigned-integer, C:8/big-unsigned-integer, D:8/big-unsigned-integer>>) ->
-  #inet{ip = {A, B, C, D}};
+  #tdm_inet{ip = {A, B, C, D}};
 decode_inet(<<A:16/big-unsigned-integer, B:16/big-unsigned-integer, C:16/big-unsigned-integer, D:16/big-unsigned-integer,
              E:16/big-unsigned-integer, F:16/big-unsigned-integer, G:16/big-unsigned-integer, H:16/big-unsigned-integer>>) ->
-  #inet{ip = {A, B, C, D, E, F, G, H}}.
+  #tdm_inet{ip = {A, B, C, D, E, F, G, H}}.
 
 -spec encode_inet(inet()) -> binary().
-encode_inet(#inet{ip = {A, B, C, D}}) ->
+encode_inet(#tdm_inet{ip = {A, B, C, D}}) ->
   <<A:8/big-unsigned-integer, B:8/big-unsigned-integer, C:8/big-unsigned-integer, D:8/big-unsigned-integer>>;
-encode_inet(#inet{ip = {A, B, C, D, E, F, G, H}}) ->  %% , port = P
+encode_inet(#tdm_inet{ip = {A, B, C, D, E, F, G, H}}) ->  %% , port = P
   <<A:16/big-unsigned-integer, B:16/big-unsigned-integer, C:16/big-unsigned-integer, D:16/big-unsigned-integer,
     E:16/big-unsigned-integer, F:16/big-unsigned-integer, G:16/big-unsigned-integer, H:16/big-unsigned-integer>>.
 

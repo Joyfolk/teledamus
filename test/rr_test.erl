@@ -11,58 +11,58 @@ unset_env() ->
 
 empty_test() ->
 	R = tdm_rr:from_app(test, round_robin),
-	?assertEqual([], R#rr_state.resources),
-	?assertEqual([], R#rr_state.rr).
+	?assertEqual([], R#tdm_rr_state.resources),
+	?assertEqual([], R#tdm_rr_state.rr).
 
 
 from_app_test() ->
 	set_env([r1, r2, r3]),
 	R = tdm_rr:from_app(test, round_robin),
-	?assertEqual([r1, r2, r3], R#rr_state.resources),
-	?assertEqual([r1, r2, r3], R#rr_state.rr),
+	?assertEqual([r1, r2, r3], R#tdm_rr_state.resources),
+	?assertEqual([r1, r2, r3], R#tdm_rr_state.rr),
   unset_env().
 
 add_test() ->
 	set_env([r1, r2, r4]),
 	RR = tdm_rr:from_app(test, round_robin),
 	R = tdm_rr:add(RR, r3),
-	?assertEqual([r1, r2, r4, r3], R#rr_state.resources),
-	?assertEqual([r1, r2, r4], R#rr_state.rr),
+	?assertEqual([r1, r2, r4, r3], R#tdm_rr_state.resources),
+	?assertEqual([r1, r2, r4], R#tdm_rr_state.rr),
 	unset_env().
 
 add_list_test() ->
 	set_env([r1, r2, r4]),
 	RR = tdm_rr:from_app(test, round_robin),
 	R = tdm_rr:add(RR, [r3, r5]),
-	?assertEqual([r1, r2, r4, r3, r5], R#rr_state.resources),
-	?assertEqual([r1, r2, r4], R#rr_state.rr),
+	?assertEqual([r1, r2, r4, r3, r5], R#tdm_rr_state.resources),
+	?assertEqual([r1, r2, r4], R#tdm_rr_state.rr),
 	unset_env().
 
 remove_test() ->
 	set_env([r1, r2, r4]),
 	RR = tdm_rr:from_app(test, round_robin),
 	R = tdm_rr:remove(RR, r2),
-	?assertEqual([r1, r4], R#rr_state.resources),
-	?assertEqual([r1, r4], R#rr_state.rr),
+	?assertEqual([r1, r4], R#tdm_rr_state.resources),
+	?assertEqual([r1, r4], R#tdm_rr_state.rr),
 	unset_env().
 
 remove_list_test() ->
 	set_env([r1, r2, r3, r4]),
 	RR = tdm_rr:from_app(test, round_robin),
 	R = tdm_rr:remove(RR, [r3, r4, r5]),
-	?assertEqual([r1, r2], R#rr_state.resources),
-	?assertEqual([r1, r2], R#rr_state.rr),
+	?assertEqual([r1, r2], R#tdm_rr_state.resources),
+	?assertEqual([r1, r2], R#tdm_rr_state.rr),
 	unset_env().
 
 reinit_test() ->
 	set_env([r1, r2, r4]),
 	RR = tdm_rr:from_app(test, round_robin),
 	R1 = tdm_rr:remove(RR, [r1, r2, r4]),
-	?assertEqual([], R1#rr_state.resources),
-	?assertEqual([], R1#rr_state.rr),
+	?assertEqual([], R1#tdm_rr_state.resources),
+	?assertEqual([], R1#tdm_rr_state.rr),
 	R = tdm_rr:reinit(R1),
-	?assertEqual([r1, r2, r4], R#rr_state.resources),
-	?assertEqual([r1, r2, r4], R#rr_state.rr),
+	?assertEqual([r1, r2, r4], R#tdm_rr_state.resources),
+	?assertEqual([r1, r2, r4], R#tdm_rr_state.rr),
 	unset_env().
 
 next_seq_test() ->
