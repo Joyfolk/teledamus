@@ -1,15 +1,9 @@
-%% custom data format
+
+
+
+%% custom data types
 -record(tdm_decimal, {scale :: integer(), value :: integer()}).
--type big_decimal() :: #tdm_decimal{}.
--export_type([big_decimal/0]).
-
--type ipv4() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
--type ipv6() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
--record(tdm_inet, {ip :: ipv4() | ipv6()}).
--type inet() :: #tdm_inet{}.
--export_type([ipv4/0, ipv6/0, inet/0]).
-
-
+-record(tdm_inet, {ip :: teledamus:ipv4() | teledamus:ipv6()}).
 
 
 -define(MAX_BODY_LENGTH, 268435455). %% from spec: currently a frame is limited to 256MB in length
@@ -20,8 +14,6 @@
 -record(tdm_header, {type :: request | response, version = 2::0..127, flags = #tdm_flags{} :: #tdm_flags{}, stream = 1 :: -127..128, opcode :: byte()}).
 -record(tdm_frame, {header :: #tdm_header{}, length :: integer(), body :: binary()}).
 -record(tdm_error, {error_code :: integer(), type :: atom(), message :: string(), additional_info :: term()}).
-
-
 
 
 %%
@@ -62,7 +54,6 @@
 -define(CONSISTENCY_LOCAL_SERIAL, 9).
 -define(CONSISTENCY_LOCAL_ONE, 10).
 
--type consistency_level() :: any | one | quorum | all | local_quorum | each_quorum | serial | local_serial | local_one.
 
 %% CQL VERSION
 -define(CQL_VERSION, <<"3.0.0">>).
@@ -117,45 +108,18 @@
 
 
 %% queries
--record(tdm_query_params, {consistency_level = quorum :: consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
-                           bind_values = []:: list(any()), paging_state :: binary(), serial_consistency = undefined :: consistency_level()}).
+-record(tdm_query_params, {consistency_level = quorum :: teledamus:consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
+                           bind_values = [] :: teledamus:bind_variables(), paging_state :: binary(), serial_consistency = undefined :: teledamus:consistency_level()}).
 
--type query_params() :: #tdm_query_params{}.
--export_type([query_params/0]).
 
 -define(BATCH_LOGGED, 0).
 -define(BATCH_UNLOGGED, 1).
 -define(BATCH_COUNTER, 2).
 
--type batch_type() :: logged | unlogged | counter.
--type prepared_batch_query() :: {binary(), list()}.
--type simple_batch_query() :: {string(), list()}.
--type single_batch_query() :: prepared_batch_query() | simple_batch_query().
 
--record(tdm_batch_query, {batch_type = logged :: batch_type(), queries :: list(single_batch_query()), consistency_level = quorum:: consistency_level()}).
--type batch_query() :: #tdm_batch_query{}.
+-record(tdm_batch_query, {batch_type = logged :: teledamus:batch_type(), queries :: [teledamus:batch_query_item()], consistency_level = quorum :: teledamus:consistency_level()}).
 
 
--record(tdm_connection, {pid :: pid(), host :: list(), port :: pos_integer(), default_stream :: stream()}).
--record(tdm_stream, {connection :: connection(), stream_pid :: pid(), stream_id :: 1..127}).
-
--type error() :: #tdm_error{}.
--type stream() :: #tdm_stream{}.
--type connection() :: #tdm_connection{}.
--type compression() :: none | lz4 | snappy.
--type options() :: [{string(), string()}].
--type keyspace() :: {keyspace, string()}.
--type schema_change() :: {created, string(), string()} | {updated, string(), string()} | {dropped, string(), string()}.
--type paging_state() :: binary().
--type colspec() :: [{string(), string(), string(), atom()}].
--type metadata() :: {colspec(), paging_state()}.
--type rows() :: [list()].
--type socket() :: gen_tcp:socket() | ssl:sslsocket().
--type transport() :: tcp | ssl.
--type result_rows() :: {metadata(), paging_state(), rows()}.
--export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, batch_query/0, result_rows/0, stream/0, compression/0, socket/0, transport/0]).
-
--type async_target() :: undefined | atom() | pid() | fun(() -> any()) | {atom(), atom(), list()}.
--export_type([async_target/0]).
-
+-record(tdm_connection, {pid :: pid(), host :: string(), port :: pos_integer(), default_stream :: teledamus:stream()}).
+-record(tdm_stream, {connection :: teledamus:connection(), stream_pid :: pid(), stream_id :: teledamus:stream_id()}).
 

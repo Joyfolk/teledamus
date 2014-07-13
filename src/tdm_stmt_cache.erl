@@ -23,20 +23,20 @@ init() ->
 %% @doc
 %% Put prepared statement id to cache for given query
 %%
-%% Query - cassandra query string
+%% Key - {host, port, query text} tuple
 %% PreparedStmtId - compiled prepared statement id
 %% @end
--spec to_cache(term(), binary()) -> true.
+-spec to_cache(Key :: {Host :: string(), Port :: pos_integer(), Query :: teledamus:query_text()}, PreparedStmtId :: teledamus:prepared_query_id()) -> true.
 to_cache(Key, PreparedStmtId) ->
   ets:insert(?STMT_CACHE, {Key, PreparedStmtId}).
 
 %% @doc
 %% Get prepared statement id to cache for given query
 %%
-%% Query - cassandra query string
+%% Key - {host, port, query text} tuple
 %% Result - compiled prepared statement id or not_found
 %% @end
--spec from_cache(term()) -> {ok, binary()} | not_found.
+-spec from_cache(Key :: {Host :: string(), Port :: pos_integer(), Query :: teledamus:query_text()}) -> {ok, teledamus:prepared_query_id()} | not_found.
 from_cache(Key) ->
   case ets:lookup(?STMT_CACHE, Key) of
     [{_, Id}] ->
@@ -53,7 +53,7 @@ from_cache(Key) ->
 %% Timeout - compile operation timeout
 %% Result - compiled {ok, prepared statement id} or error
 %% @end
--spec cache(list(), connection(), timeout()) -> {ok, binary()} | error().
+-spec cache(Query :: teledamus:query_text(), Con :: teledamus:connection(), Timeout :: timeout()) -> {ok, teledamus:prepared_query_id()} | teledamus:error().
 cache(Query, Con, Timeout) ->
   #tdm_connection{host = Host, port = Port} = Con,
   case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
@@ -69,7 +69,7 @@ cache(Query, Con, Timeout) ->
       end
   end.
 
--spec cache_async(Query :: string(), Con :: connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
+-spec cache_async(Query :: teledamus:query_text(), Con ::  teledamus:connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
 cache_async(Query, Con, ReplyTo) ->
 	#tdm_connection{host = Host, port = Port} = Con,
 	case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
@@ -87,7 +87,7 @@ cache_async(Query, Con, ReplyTo) ->
 			end)
 	end.
 
--spec cache_async_multple(Queries :: [string()], Con :: connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
+-spec cache_async_multple(Queries :: [teledamus:query_text()], Con :: teledamus:connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
 cache_async_multple(ToCache, Con, ReplyTo) ->
 	cache_async_multple(ToCache, Con, ReplyTo, dict:new()).
 

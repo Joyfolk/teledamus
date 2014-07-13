@@ -19,7 +19,8 @@
 -define(DEF_STREAM_ETS, default_streams).
 
 
--record(state, {transport = gen_tcp :: transport(), socket :: socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: compression(), streams :: dict(), host :: list(), port :: pos_integer()}).
+-record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
+                streams :: dict(), host :: list(), port :: pos_integer()}).
 
 
 %%%===================================================================
@@ -30,101 +31,101 @@
 send_frame(Pid, Frame) ->
 	gen_server:cast(Pid, {send_frame, Frame}).
 
--spec new_stream(connection(), timeout()) -> stream() | error().
+-spec new_stream(teledamus:connection(), timeout()) -> teledamus:stream() | teledamus:error().
 new_stream(#tdm_connection{pid = Pid}, Timeout) ->
   gen_server:call(Pid, new_stream, Timeout).
 
--spec release_stream(stream(), timeout()) -> ok | error().
+-spec release_stream(teledamus:stream(), timeout()) -> ok | teledamus:error().
 release_stream(S = #tdm_stream{connection = #tdm_connection{pid = Pid}}, Timeout) ->
   tdm_stream:stop(S),
   gen_server:call(Pid, {release_stream, S}, Timeout).
 
--spec release_stream_async(stream()) -> ok | error().
+-spec release_stream_async(teledamus:stream()) -> ok | teledamus:error().
 release_stream_async(S = #tdm_stream{connection = #tdm_connection{pid = Pid}}) ->
     tdm_stream:stop(S),
     gen_server:cast(Pid, {release_stream, S}).
 
--spec options(Connection :: connection(), Timeout :: timeout()) ->  timeout | error() | options().
+-spec options(Connection :: teledamus:connection(), Timeout :: timeout()) ->  timeout | teledamus:error() | teledamus:options().
 options(#tdm_connection{default_stream = Stream}, Timeout) ->
   tdm_stream:options(Stream, Timeout).
 
--spec options_async(Connection :: connection(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec options_async(Connection :: teledamus:connection(), ReplyTo :: teledamus:async_target()) ->  ok | {error, Reason :: term()}.
 options_async(#tdm_connection{default_stream = Stream}, Timeout) ->
 	tdm_stream:options_async(Stream, Timeout).
 
--spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout) ->
 	tdm_stream:query(Stream, Query, Params, Timeout).
 
--spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec query_async(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), ReplyTo :: teledamus:async_target()) ->  ok | {error, Reason :: term()}.
 query_async(#tdm_connection{default_stream = Stream}, Query, Params, ReplyTo) ->
 	tdm_stream:query_async(Stream, Query, Params, ReplyTo).
 
--spec query(Con :: connection(), Query :: string(), Params :: query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
 	tdm_stream:query(Stream, Query, Params, Timeout, UseCache).
 
--spec query_async(Con :: connection(), Query :: string(), Params :: query_params(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+-spec query_async(Con :: teledamus:connection(), Query :: string(), Params :: teledamus:query_params(), ReplyTo :: teledamus:async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 query_async(#tdm_connection{default_stream = Stream}, Query, Params, ReplyTo, UseCache) ->
 	tdm_stream:query_async(Stream, Query, Params, ReplyTo, UseCache).
 
--spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
+-spec prepare_query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Timeout :: timeout()) -> timeout | teledamus:error() | {binary(), teledamus:metadata(), teledamus:metadata()}.
 prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout) ->
 	tdm_stream:prepare_query(Stream, Query, Timeout).
 
--spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec prepare_query_async(Con :: teledamus:connection(), Query :: teledamus:query_text(), ReplyTo :: teledamus:async_target()) ->  ok | {error, Reason :: term()}.
 prepare_query_async(#tdm_connection{default_stream = Stream}, Query, ReplyTo) ->
 	tdm_stream:prepare_query_async(Stream, Query, ReplyTo).
 
--spec prepare_query(Con :: connection(), Query :: string(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
+-spec prepare_query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | teledamus:error() | {binary(), teledamus:metadata(), teledamus:metadata()}.
 prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout, UseCache) ->
 	tdm_stream:prepare_query(Stream, Query, Timeout, UseCache).
 
--spec prepare_query_async(Con :: connection(), Query :: string(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+-spec prepare_query_async(Con :: teledamus:connection(), Query :: teledamus:query_text(), ReplyTo :: teledamus:async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 prepare_query_async(#tdm_connection{default_stream = Stream}, Query, ReplyTo, UseCache) ->
 	tdm_stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
 
--spec execute_query(Con :: connection(), ID :: binary(), Params :: query_params(), Timeout :: timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec execute_query(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 execute_query(#tdm_connection{default_stream = Stream}, ID, Params, Timeout) ->
   tdm_stream:execute_query(Stream, ID, Params, Timeout).
 
--spec execute_query_async(Con :: connection(), ID :: binary(), Params :: query_params(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec execute_query_async(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), ReplyTo :: teledamus:async_target()) ->  ok | {error, Reason :: term()}.
 execute_query_async(#tdm_connection{default_stream = Stream}, ID, Params, ReplyTo) ->
 	tdm_stream:execute_query_async(Stream, ID, Params, ReplyTo).
 
--spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout()) -> timeout | ok | error().
+-spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout()) -> timeout | ok | teledamus:error().
 batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout) ->
   tdm_stream:batch_query(Stream, Batch, Timeout).
 
--spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target()) ->  ok | {error, Reason :: term()}.
+-spec batch_query_async(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), ReplyTo :: teledamus:async_target()) ->  ok | {error, Reason :: term()}.
 batch_query_async(#tdm_connection{default_stream = Stream}, Batch, ReplyTo) ->
 	tdm_stream:batch_query_async(Stream, Batch, ReplyTo).
 
--spec batch_query(Con :: connection(), Batch :: batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | error().
+-spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error().
 batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout, UseCache) ->
 	tdm_stream:batch_query(Stream, Batch, Timeout, UseCache).
 
--spec batch_query_async(Con :: connection(), Batch :: batch_query(), ReplyTo :: async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
+-spec batch_query_async(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), ReplyTo :: teledamus:async_target(), UseCache :: boolean()) -> ok | {error, Reason :: term()}.
 batch_query_async(#tdm_connection{default_stream = Stream}, Batch, ReplyTo, UseCache) ->
 	tdm_stream:batch_query_async(Stream, Batch, ReplyTo, UseCache).
 
--spec subscribe_events(Con :: connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | error().
+-spec subscribe_events(Con :: teledamus:connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | teledamus:error().
 subscribe_events(#tdm_connection{default_stream = Stream}, EventTypes, Timeout) ->
 	tdm_stream:subscribe_events(Stream, EventTypes, Timeout).
 
--spec subscribe_events_async(Con :: connection(), EventTypes :: list(string() | atom()), ReplyTo :: async_target()) -> ok | timeout | {error, Reason :: term()}.
+-spec subscribe_events_async(Con :: teledamus:connection(), EventTypes :: [string() | atom()], ReplyTo :: teledamus:async_target()) -> ok | timeout | {error, Reason :: term()}.
 subscribe_events_async(#tdm_connection{default_stream = Stream}, EventTypes, ReplyTo) ->
 	tdm_stream:subscribe_events_async(Stream, EventTypes, ReplyTo).
 
--spec get_socket(Con :: connection()) -> socket() | {error, Reason :: term()}.
+-spec get_socket(Con :: teledamus:connection()) -> teledamus:socket() | {error, Reason :: term()}.
 get_socket(#tdm_connection{pid = Pid})->
   gen_server:call(Pid, get_socket).
 
--spec from_cache(Con :: connection(), Query :: string()) -> {ok, binary()} | not_found.
+-spec from_cache(Con :: teledamus:connection(), Query :: string()) -> {ok, binary()} | not_found.
 from_cache(#tdm_connection{host = Host, port = Port}, Query) ->
   tdm_stmt_cache:from_cache({Host, Port, Query}).
 
--spec to_cache(Con :: connection(), Query :: string(), PreparedStmtId :: binary()) -> true.
+-spec to_cache(Con :: teledamus:connection(), Query :: teledamus:query_text(), PreparedStmtId :: binary()) -> true.
 to_cache(#tdm_connection{host = Host, port = Port}, Query, PreparedStmtId) ->
   tdm_stmt_cache:to_cache({Host, Port, Query}, PreparedStmtId).
 

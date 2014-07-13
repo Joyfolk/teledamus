@@ -263,7 +263,7 @@ compression_test() ->
 	Flags = #tdm_flags{compressing = true, tracing = false},
 	Header = #tdm_header{type = request, version = 2, flags = Flags, opcode = 12, stream = 37},
 	F = #tdm_frame{header = Header, body = <<>>},
-	C = {"test", {native_parser_test, dummy_zip, dummy_unzip}, 3},
+	C = {"test", {tdm_native_parser_test, dummy_zip, dummy_unzip}, 3},
 	?assertEqual(<<0:1,2:7,1:8,37:8,12:8,0:32>>, tdm_native_parser:encode_frame(F, C)),
 	?assertEqual(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<4,5,6,7>>}, C)),
 	?assertEqual({F#tdm_frame{length = 0, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, C)),

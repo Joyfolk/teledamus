@@ -6,12 +6,50 @@
 %%%-------------------------------------------------------------------
 -module(teledamus).
 
-
-
-
-
-
 -include_lib("teledamus.hrl").
+
+%% custom data types
+-type big_decimal() :: #tdm_decimal{}.
+-type ipv4() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+-type ipv6() :: {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()}.
+-type inet() :: #tdm_inet{}.
+
+-export_type([big_decimal/0, ipv4/0, ipv6/0, inet/0]).
+
+%% cassandra types
+-type bind_variable() :: {any(), term()}. %% todo: refactor
+-type bind_variables() :: [bind_variable()].
+-type consistency_level() :: any | one | quorum | all | local_quorum | each_quorum | serial | local_serial | local_one.
+-type query_params() :: #tdm_query_params{}.
+-type batch_type() :: logged | unlogged | counter.
+-type query_text() :: string().
+-type prepared_query_id() :: binary().
+-type batch_query_item() :: {query_text() | prepared_query_id(), bind_variables()}.
+-type batch_query() :: #tdm_batch_query{}.
+
+-export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, bind_variable/0]).
+
+%% api specific
+-type async_target() :: undefined | atom() | pid() | fun(() -> any()) | {atom(), atom(), list()}.
+-export_type([async_target/0]).
+
+-type error() :: #tdm_error{}.
+-type stream() :: #tdm_stream{}.
+-type stream_id() :: 1..127.
+-type connection() :: #tdm_connection{}.
+-type compression() :: none | lz4 | snappy.
+-type options() :: [{string(), string()}].
+-type keyspace() :: {keyspace, string()}.
+-type schema_change() :: {created, string(), string()} | {updated, string(), string()} | {dropped, string(), string()}.
+-type paging_state() :: binary().
+-type colspec() :: [{string(), string(), string(), atom()}].
+-type metadata() :: {colspec(), paging_state()}.
+-type rows() :: [list()].
+-type socket() :: gen_tcp:socket() | ssl:sslsocket().
+-type transport() :: tcp | ssl.
+-type result_rows() :: {metadata(), paging_state(), rows()}.
+-export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, result_rows/0, stream/0, compression/0, socket/0, transport/0, stream_id/0]).
+
 
 -export([get_connection/0, get_connection/1, release_connection/1, release_connection/2, options/2, options/1, query/2, query/3, query/4, query/5, prepare_query/2, prepare_query/3, prepare_query/4,
          execute_query/2, execute_query/3, execute_query/4, batch_query/2, batch_query/3, batch_query/4, subscribe_events/2, subscribe_events/3, start/0, stop/0,
