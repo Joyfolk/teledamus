@@ -182,9 +182,7 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
                     {stop, {error, E, EE}}
             end;
         {error, Reason} ->
-            {stop, Reason};
-        R ->
-            {stop, {unknown_error, R}}
+            {stop, Reason}
     end,
     RR.
 
