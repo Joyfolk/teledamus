@@ -17,8 +17,11 @@
 -export_type([big_decimal/0, ipv4/0, ipv6/0, inet/0]).
 
 %% cassandra types
--type bind_variable() :: {any(), term()}. %% todo: refactor
--type bind_variables() :: [bind_variable()].
+-type cql_plain_type() :: ascii | bigint | blob | boolean | counter | decimal | double | float | int | text | timestamp | uuid | varchar | varint | timeuuid |inet.
+-type cql_type() :: cql_plain_type() | {list, cql_plain_type()} | {set, cql_plain_type()} | {map, cql_plain_type(), cql_plain_type()} | {custom, string()}.
+-type cql_tagged_value() :: {cql_type(), any()}.
+
+-type bind_variables() :: [cql_tagged_value()].
 -type consistency_level() :: any | one | quorum | all | local_quorum | each_quorum | serial | local_serial | local_one.
 -type query_params() :: #tdm_query_params{}.
 -type batch_type() :: logged | unlogged | counter.
@@ -27,7 +30,7 @@
 -type batch_query_item() :: {query_text() | prepared_query_id(), bind_variables()}.
 -type batch_query() :: #tdm_batch_query{}.
 
--export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, bind_variable/0]).
+-export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, cql_type/0, cql_tagged_value/0, cql_plain_type/0]).
 
 %% api specific
 -type async_target() :: undefined | atom() | pid() | fun(() -> any()) | {atom(), atom(), list()}.

@@ -2,20 +2,12 @@
 
 -include_lib("teledamus.hrl").
 
-%% cql types
--type cql_value_type() :: atom() | term(). %% should be recursive type definition, but it's not supported by erlang
--type cql_data() :: binary().
--type cql_value() :: any().
--type cql_tagged_value() :: {cql_value_type(), cql_value()}.
-%% -type cql_string() :: string() | list(non_neg_integer()).
-%% -export_type([cql_value_type/0, cql_data/0, cql_value/0, cql_tagged_value/0, cql_string/0]).
-
 
 %% API
 -export([decode_t/2, decode_v/2, decode_tv/2, encode_t/1, encode/2, erase_type/1, decode/2]).
 
 
--spec decode_t(cql_value_type(), cql_data()) -> {cql_tagged_value(), cql_data()}.
+-spec decode_t(teledamus:cql_type(), binary()) -> {teledamus:cql_tagged_value(), binary()}.
 decode_t(Type, D) ->
     {V, R} = decode(Type, D),
     {{Type, V}, R}.
@@ -26,20 +18,19 @@ decode_v(Type, D) ->
 decode_tv(Type, D) ->
     element(1, decode_t(Type, D)).
 
--spec encode_t(cql_tagged_value()) -> cql_data().
+-spec encode_t(teledamus:cql_tagged_value()) -> binary().
 encode_t({Type, Value}) ->
     encode(Type, Value).
 
-
--spec erase_type(cql_tagged_value()) -> cql_value().
+-spec erase_type(teledamus:cql_tagged_value()) -> any().
 erase_type({_Type, Value}) ->
     Value.
 
-
--spec decode(cql_value_type(), cql_data()) -> {cql_value(), cql_data()}.
+-spec decode(teledamus:cql_type(), binary()) -> {any(), binary()}.
 decode(Type, Value) ->
     decode(Type, Value, int).
 
+-spec get_length(teledamus:cql_type(), short | int) -> {non_neg_integer(), binary()}.
 get_length(Data, IntSize) ->
     S = case IntSize of
         short -> 16;
@@ -48,7 +39,7 @@ get_length(Data, IntSize) ->
     <<Length:S/signed, Rest/binary>> = Data,
     {Length, Rest}.
 
--spec decode(cql_value_type(), cql_data(), int | short) -> {cql_value(), cql_data()}.
+-spec decode(teledamus:cql_type(), binary(), int | short) -> {any(), binary()}.
 decode(Type, Value, IntSize) ->
 %%   decode_int
     {Length, Data} = get_length(Value, IntSize),
@@ -96,11 +87,11 @@ decode(Type, Value, IntSize) ->
 
 
 
--spec encode(cql_value_type(), cql_value()) -> cql_data().
+-spec encode(teledamus:cql_type(), any()) -> binary().
 encode(Type, Value) ->
     encode(Type, Value, int).
 
--spec encode(cql_value_type(), cql_value(), int | short) -> cql_data().
+-spec encode(teledamus:cql_type(), any(), int | short) -> binary().
 encode(Type, Value, IntSize) ->
     if
         Value =/= undefined ->
@@ -148,12 +139,12 @@ encode(Type, Value, IntSize) ->
             encode_int(-1, IntSize)
     end.
 
--spec decode_collection(binary(), non_neg_integer(), cql_value_type()) -> list(cql_value()).
+-spec decode_collection(binary(), non_neg_integer(), teledamus:cql_type()) -> [any()].
 decode_collection(X, N, T)  ->
     {L, _Rest} = decode_collection(X, N, T, []),
     lists:reverse(L).
 
--spec decode_collection(binary(), non_neg_integer(), cql_value_type(), list(cql_value())) -> list(cql_value()).
+-spec decode_collection(binary(), non_neg_integer(), teledamus:cql_type(), [any()]) -> [any()].
 decode_collection(X, N, T, Acc) ->
     if
         N =< 0 ->
@@ -166,12 +157,12 @@ decode_collection(X, N, T, Acc) ->
             decode_collection(X1, N - 1, T, [V | Acc])
     end.
 
--spec decode_map(binary(), non_neg_integer(), cql_value_type(), cql_value_type()) -> list({cql_value(), cql_value()}).
+-spec decode_map(binary(), non_neg_integer(), teledamus:cql_type(), teledamus:cql_type()) -> [{any(), any()}].
 decode_map(X, N, K, V)  ->
     {L, _Rest} = decode_map(X, N, K, V, []),
     lists:reverse(L).
 
--spec decode_map(binary(), non_neg_integer(), cql_value_type(), cql_value_type(), list({cql_value(), cql_value()})) -> list({cql_value(), cql_value()}).
+-spec decode_map(binary(), non_neg_integer(),  teledamus:cql_type(), teledamus:cql_type(), [{any(), any()}]) -> [{any(), any()}].
 decode_map(X, N, K, V, Acc) ->
     if
         N =< 0 ->
@@ -182,11 +173,11 @@ decode_map(X, N, K, V, Acc) ->
             decode_map(X2, N - 1, K, V, [{KV, VV} | Acc])
     end.
 
--spec decode_string(binary(), unicode | ascii) -> list(integer()).
+-spec decode_string(binary(), unicode | ascii) -> [integer()].
 decode_string(V, unicode) ->  unicode:characters_to_list(V, utf8);
 decode_string(V, ascii) ->  binary_to_list(V).
 
--spec encode_string(list(integer()), unicode | ascii) -> binary().
+-spec encode_string([integer()], unicode | ascii) -> binary().
 encode_string(V, ascii) -> list_to_binary(V);
 encode_string(V, unicode) -> unicode:characters_to_binary(V, utf8).
 
