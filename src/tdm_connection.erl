@@ -19,7 +19,7 @@
 -define(DEF_STREAM_ETS, default_streams).
 
 
--record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
+-record(state, {transport = tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
     streams :: dict(), host :: list(), port :: pos_integer()}).
 
 
@@ -246,7 +246,7 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
     case Request of
         {send_frame, Frame} ->
             case Transport of
-                gen_tcp ->
+                tcp ->
                     erlang:port_command(Socket, Frame);
                 _ ->
                     Transport:send(Socket, Frame)

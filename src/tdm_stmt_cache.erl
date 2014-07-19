@@ -74,7 +74,7 @@ cache_async(Query, Con, ReplyTo) ->
     #tdm_connection{host = Host, port = Port} = Con,
     case ets:lookup(?STMT_CACHE, {Host, Port, Query}) of
         [{_, Id}] ->
-            {ok, Id};
+            ReplyTo({ok, Id});
         [] ->
             tdm_connection:prepare_query_async(Con, Query, fun(Res) ->
                 case Res of
@@ -85,7 +85,8 @@ cache_async(Query, Con, ReplyTo) ->
                         ReplyTo(Err)
                 end
             end)
-    end.
+    end,
+    ok.
 
 -spec cache_async_multple(Queries :: [teledamus:query_text()], Con :: teledamus:connection(), Fun :: fun((Res :: term()) -> any())) -> ok | {error, Reason :: term()}.
 cache_async_multple(ToCache, Con, ReplyTo) ->

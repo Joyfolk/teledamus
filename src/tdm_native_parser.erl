@@ -84,7 +84,7 @@ parse_frame(<<Header:4/binary, Length:32/big-unsigned-integer, Body:Length/binar
     #tdm_flags{tracing = IsTracing} = H#tdm_header.flags,
     case IsTracing of
         true ->
-            {TracingId, Body2} = parse_uuid(decompress_if_needed(F, Compression)),
+            {TracingId, Body2} = parse_uuid((decompress_if_needed(F, Compression))#tdm_frame.body),
             error_logger:info_msg("TracingId = ~p", [TracingId]),
             {F#tdm_frame{body = Body2}, Rest};
         false ->
@@ -397,7 +397,7 @@ parse_error(#tdm_frame{body = Body}) ->
             {Received, XT1} = parse_int(XT0),
             {BlockFor, XT2} = parse_int(XT1),
             {DataPresent, _XT3} = parse_byte(XT2),
-            DP = if DataPresent =:= 0 -> false; true -> true end,
+            DP = if DataPresent =:= <<0>> -> false; true -> true end,
             Error#tdm_error{type = read_timeout, additional_info = [{consistency_level, CL}, {nodes_received, Received}, {nodes_required, BlockFor}, {data_present, DP}]};
         ?ERR_SYNTAX_ERROR ->
             Error#tdm_error{type = syntax_error};
@@ -612,8 +612,7 @@ encode_batch_type(BatchType) ->
     R = case BatchType of
         logged -> ?BATCH_LOGGED;
         unlogged -> ?BATCH_UNLOGGED;
-        counter -> ?BATCH_COUNTER;
-        _ -> ?BATCH_LOGGED
+        counter -> ?BATCH_COUNTER
     end,
     encode_byte(R).
 

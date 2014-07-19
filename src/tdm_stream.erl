@@ -310,7 +310,8 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
 start_gen_event_if_required() ->
     case whereis(cassandra_events) of
         undefined ->
-            gen_event:start_link(cassandra_events);
+            {ok, _Pid} = gen_event:start_link({local, cassandra_events}),
+            ok;
         _ ->
             ok
     end.

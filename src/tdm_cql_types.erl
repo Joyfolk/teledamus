@@ -30,13 +30,13 @@ erase_type({_Type, Value}) ->
 decode(Type, Value) ->
     decode(Type, Value, int).
 
--spec get_length(teledamus:cql_type(), short | int) -> {non_neg_integer(), binary()}.
+-spec get_length(binary(), short | int) -> {non_neg_integer(), binary()}.
 get_length(Data, IntSize) ->
     S = case IntSize of
         short -> 16;
         int -> 32
     end,
-    <<Length:S/signed, Rest/binary>> = Data,
+    <<Length:S/unsigned, Rest/binary>> = Data,
     {Length, Rest}.
 
 -spec decode(teledamus:cql_type(), binary(), int | short) -> {any(), binary()}.
@@ -139,12 +139,12 @@ encode(Type, Value, IntSize) ->
             encode_int(-1, IntSize)
     end.
 
--spec decode_collection(binary(), non_neg_integer(), teledamus:cql_type()) -> [any()].
+-spec decode_collection(X :: binary(), N :: non_neg_integer(), T :: teledamus:cql_type()) -> [any()].
 decode_collection(X, N, T)  ->
     {L, _Rest} = decode_collection(X, N, T, []),
     lists:reverse(L).
 
--spec decode_collection(binary(), non_neg_integer(), teledamus:cql_type(), [any()]) -> [any()].
+-spec decode_collection(X :: binary(), N :: non_neg_integer(), T :: teledamus:cql_type(), Acc :: [any()]) -> {[any()], binary()}.
 decode_collection(X, N, T, Acc) ->
     if
         N =< 0 ->
@@ -162,7 +162,7 @@ decode_map(X, N, K, V)  ->
     {L, _Rest} = decode_map(X, N, K, V, []),
     lists:reverse(L).
 
--spec decode_map(binary(), non_neg_integer(),  teledamus:cql_type(), teledamus:cql_type(), [{any(), any()}]) -> [{any(), any()}].
+-spec decode_map(binary(), non_neg_integer(),  teledamus:cql_type(), teledamus:cql_type(), [{any(), any()}]) -> {[{any(), any()}], binary()}.
 decode_map(X, N, K, V, Acc) ->
     if
         N =< 0 ->
@@ -191,38 +191,39 @@ decode_int(X) when is_binary(X) ->
     <<V:L/big-signed-integer>> = X,
     V.
 
--spec encode_int(integer(), byte | short | int | long | big) -> binary().
-encode_int(V, byte) -> <<V:8/big-signed-integer>>;
-encode_int(V, short) -> <<V:16/big-signed-integer>>;
-encode_int(V, int) -> <<V:32/big-signed-integer>>;
-encode_int(V, long) -> <<V:64/big-signed-integer>>;
+-type int_type() :: 'short' | 'int' | 'long' | 'bigint'.
+-spec encode_int(integer(), int_type()) -> binary().
+%% encode_int(V, bytes) -> <<V:1/big-signed-integer-unit:8>>;
+encode_int(V, short) -> <<V:2/big-signed-integer-unit:8>>;
+encode_int(V, int) -> <<V:4/big-signed-integer-unit:8>>;
+encode_int(V, long) -> <<V:8/big-signed-integer-unit:8>>;
 encode_int(V, bigint) ->
-    L = int_size(V) * 8,
-    <<V:L/big-signed-integer>>.
+    L = int_size(V),
+    <<V:L/big-signed-integer-unit:8>>.
 
--spec decode_uint(binary()) -> binary().
-decode_uint(<<V:8/big-unsigned-integer>>) -> V;
-decode_uint(<<V:16/big-unsigned-integer>>) -> V;
-decode_uint(<<V:32/big-unsigned-integer>>) -> V;
-decode_uint(<<V:64/big-unsigned-integer>>) -> V;
-decode_uint(X) when is_binary(X) ->
-    L = byte_size(X) * 8,
-    <<V:L/big-unsigned-integer>> = X,
-    V.
+%% -spec decode_uint(binary()) -> binary().
+%% decode_uint(<<V:8/big-unsigned-integer>>) -> V;
+%% decode_uint(<<V:16/big-unsigned-integer>>) -> V;
+%% decode_uint(<<V:32/big-unsigned-integer>>) -> V;
+%% decode_uint(<<V:64/big-unsigned-integer>>) -> V;
+%% decode_uint(X) when is_binary(X) ->
+%%     L = byte_size(X) * 8,
+%%     <<V:L/big-unsigned-integer>> = X,
+%%     V.
 
--spec encode_uint(non_neg_integer(), byte | short | int | long | big) -> binary().
-encode_uint(V, byte) -> <<V:8/big-unsigned-integer>>;
+-spec encode_uint(non_neg_integer(), int_type()) -> binary().
+%% encode_uint(V, byte) -> <<V:8/big-unsigned-integer>>;
 encode_uint(V, short) -> <<V:16/big-unsigned-integer>>;
-encode_uint(V, int) -> <<V:32/big-unsigned-integer>>;
-encode_uint(V, long) -> <<V:64/big-unsigned-integer>>;
-encode_uint(V, bigint) -> binary:encode_unsigned(V).
+encode_uint(V, int) -> <<V:32/big-unsigned-integer>>.
+%% encode_uint(V, long) -> <<V:64/big-unsigned-integer>>;
+%% encode_uint(V, bigint) -> binary:encode_unsigned(V).
 
 
 -spec decode_float(binary()) -> float().
 decode_float(<<V:32/big-float>>) -> V;
 decode_float(<<V:64/big-float>>) -> V.
 
--spec encode_float(binary(), float | double) -> float().
+-spec encode_float(float(), float | double) -> binary().
 encode_float(V, float) -> <<V:32/big-float>>;
 encode_float(V, double) -> <<V:64/big-float>>.
 
@@ -246,7 +247,7 @@ decode_decimal(Data) ->
     <<V:L/big-signed-integer>> = Value,
     #tdm_decimal{scale = Scale, value = V}.
 
--spec encode_decimal(teledamus:big_decimal()) -> {binary()}.
+-spec encode_decimal(teledamus:big_decimal()) -> binary().
 encode_decimal(#tdm_decimal{scale = Scale, value = Value}) ->
     L = int_size(Value) * 8,
     <<Scale:32/big-signed-integer, Value:L/big-signed-integer>>.

@@ -33,7 +33,7 @@
 -export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, cql_type/0, cql_tagged_value/0, cql_plain_type/0]).
 
 %% api specific
--type async_target() :: undefined | atom() | pid() | fun(() -> any()) | {atom(), atom(), list()}.
+-type async_target() :: undefined | atom() | pid() | fun((any()) -> any()) | {atom(), atom(), list()}.
 -export_type([async_target/0]).
 
 -type error() :: #tdm_error{}.
@@ -180,7 +180,7 @@ release_stream(Stream, Timeout) ->
 %%% @end
 -spec options(connection() | stream()) -> timeout | error() | options().
 options(Stream = #tdm_stream{}) ->
-    tdm_connection:options(Stream, ?DEFAULT_TIMEOUT);
+    tdm_stream:options(Stream, ?DEFAULT_TIMEOUT);
 options(Connection) ->
     tdm_connection:options(Connection, ?DEFAULT_TIMEOUT).
 
@@ -192,7 +192,7 @@ options(Connection) ->
 %%% @end
 -spec options_async(Connection :: connection() | stream(), async_target()) -> ok | {error, Reason :: term()}.
 options_async(Stream = #tdm_stream{}, ReplyTo) ->
-    tdm_connection:options_async(Stream, ReplyTo);
+    tdm_stream:options_async(Stream, ReplyTo);
 options_async(Connection, ReplyTo) ->
     tdm_connection:options_async(Connection, ReplyTo).
 
