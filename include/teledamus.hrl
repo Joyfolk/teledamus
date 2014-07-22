@@ -1,8 +1,10 @@
 
-
-
 %% custom data types
--record(tdm_decimal, {scale :: integer(), value :: integer()}).
+-record(tdm_decimal, {
+    scale :: integer(),
+    value :: integer()
+}).
+
 -record(tdm_inet, {ip :: teledamus:ipv4() | teledamus:ipv6()}).
 
 
@@ -10,10 +12,31 @@
 -define(MAX_SHORT_LENGTH, 65535).
 -define(MAX_LONG_LENGTH, 2147483647).
 
--record(tdm_flags, {compressing = false:: boolean(), tracing = false:: boolean()}).
--record(tdm_header, {type :: request | response, version = 2::0..127, flags = #tdm_flags{} :: #tdm_flags{}, stream = 1 :: -127..128, opcode :: byte()}).
--record(tdm_frame, {header :: #tdm_header{}, length :: integer(), body :: binary()}).
--record(tdm_error, {error_code :: integer(), type :: atom(), message :: string(), additional_info :: term()}).
+-record(tdm_flags, {
+    compressing = false:: boolean(),
+    tracing = false:: boolean()
+}).
+
+-record(tdm_header, {
+    type :: request | response,
+    version = 3 :: 0..127,
+    flags = #tdm_flags{} :: #tdm_flags{},
+    stream = 1 :: integer(),
+    opcode :: byte()
+}).
+
+-record(tdm_frame, {
+    header :: #tdm_header{},
+    length :: integer(),
+    body :: binary()
+}).
+
+-record(tdm_error, {
+    error_code :: integer(),
+    type :: atom(),
+    message :: string(),
+    additional_info :: term()
+}).
 
 
 %%
@@ -105,11 +128,21 @@
 -define(OPT_LIST,      16#0020).
 -define(OPT_MAP,       16#0021).
 -define(OPT_SET,       16#0022).
+-define(OPT_UDT,       16#0030).
+-define(OPT_TUPLE,     16#0031).
 
 
 %% queries
--record(tdm_query_params, {consistency_level = quorum :: teledamus:consistency_level(), skip_metadata = false:: boolean(), page_size :: integer(),
-    bind_values = [] :: teledamus:bind_variables() | undefined, paging_state :: binary(), serial_consistency = undefined :: teledamus:consistency_level() | undefined}).
+-record(tdm_query_params, {
+    consistency_level = quorum :: teledamus:consistency_level(),
+    skip_metadata = false :: boolean(),
+    page_size = undefined:: integer(),
+    bind_values = [] :: teledamus:bind_variables() | undefined,
+    paging_state = undefined :: binary(),
+    serial_consistency = undefined :: teledamus:consistency_level() | undefined,
+    timestamp = undefined :: non_neg_integer() | undefined,
+    named_values = false :: boolean()
+}).
 
 
 -define(BATCH_LOGGED, 0).
@@ -117,9 +150,32 @@
 -define(BATCH_COUNTER, 2).
 
 
--record(tdm_batch_query, {batch_type = logged :: teledamus:batch_type(), queries :: [teledamus:batch_query_item()], consistency_level = quorum :: teledamus:consistency_level()}).
+-record(tdm_batch_query, {
+    batch_type = logged :: teledamus:batch_type(),
+    queries :: [teledamus:batch_query_item()],
+    consistency_level = quorum :: teledamus:consistency_level(),
+    serial_consistency = undefined :: teledamus:consistency_level() | undefined,
+    timestamp = undefined :: non_neg_integer() | undefined,
+    named_values = false :: boolean()
+}).
 
 
--record(tdm_connection, {pid :: pid(), host :: string(), port :: pos_integer(), default_stream :: teledamus:stream()}).
--record(tdm_stream, {connection :: teledamus:connection(), stream_pid :: pid(), stream_id :: teledamus:stream_id()}).
+-record(tdm_connection, {
+    pid :: pid(),
+    host :: string(),
+    port :: pos_integer(),
+    default_stream :: teledamus:stream()
+}).
+
+-record(tdm_stream, {
+    connection :: teledamus:connection(),
+    stream_pid :: pid(),
+    stream_id :: teledamus:stream_id()
+}).
+
+-record(tdm_udt, {
+    keyspace :: string(),
+    name :: string(),
+    fields = [] :: [{Name :: string(), Type :: any()}]
+}).
 

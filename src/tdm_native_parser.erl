@@ -10,17 +10,20 @@
 -export([parse_string_map/1, encode_string_map/1, parse_string_multimap/1, encode_string_multimap/1]).
 -export([parse_option/1, encode_option/1, parse_option_list/1, encode_option_list/1]).
 -export([parse_error/1, parse_result/1, parse_metadata/1]).
--export([encode_query_flags/1,encode_query_params/1,encode_batch_query/1,parse_event/1,encode_query/2]).
+-export([encode_query_flags/1, encode_query_params/1, encode_batch_query/1, parse_event/1, encode_query/2]).
 -export([encode_event_types/1]).
 
-parse_frame_header(<<Type:1, Version:7/big-unsigned-integer, Flags:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>) ->
+parse_frame_header(<<Type:1, Version:7/big-unsigned-integer, Flags:1/binary, Stream:16/big-signed-integer, OpCode:8/big-unsigned-integer>>) ->
     #tdm_header{type = parse_type(Type), version = Version, flags = parse_flags(Flags), stream = Stream, opcode = OpCode}.
 
 
 encode_frame_header(#tdm_header{type = Type, version = Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
-    F = encode_flags(Flags),
-    T = encode_type(Type),
-    <<T:1, Version:7/big-unsigned-integer, F:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>.
+    case Version of
+        3 ->
+            F = encode_flags(Flags),
+            T = encode_type(Type),
+            <<T:1, Version:7/big-unsigned-integer, F:1/binary, Stream:16/big-signed-integer, OpCode:8/big-unsigned-integer>>
+    end.
 
 parse_type(0) -> request;
 parse_type(1) -> response.
@@ -78,7 +81,7 @@ compress_if_needed(Frame, Compression) ->
             throw({unsupported_compression_type, Compression})
     end.
 
-parse_frame(<<Header:4/binary, Length:32/big-unsigned-integer, Body:Length/binary, Rest/binary>>, Compression) ->
+parse_frame(<<Header:5/binary, Length:32/big-unsigned-integer, Body:Length/binary, Rest/binary>>, Compression) ->
     H = parse_frame_header(Header),
     F = #tdm_frame{header = H, length = Length, body = Body},
     #tdm_flags{tracing = IsTracing} = H#tdm_header.flags,
@@ -114,6 +117,9 @@ encode_int(V) ->
 
 parse_byte(<<V:1/binary, Rest/binary>>) ->
     {V, Rest}.
+
+encode_long(V) ->
+    <<V:64/big-signed-integer>>.
 
 encode_byte(V) ->
     <<V:8/big-signed-integer>>.
@@ -248,6 +254,12 @@ parse_option(X) ->
             {T, X1} = parse_option(X0),
             {{set, T}, X1};
 
+        ?OPT_UDT ->
+            parse_udt(X0);
+
+        ?OPT_TUPLE ->
+            parse_tuple(X0);
+
         _ ->
             throw({unsupported_option_type, Type})
     end.
@@ -271,12 +283,41 @@ encode_option(Type) ->
         varint -> encode_short(?OPT_VARINT);
         timeuuid -> encode_short(?OPT_TIMEUUID);
         inet -> encode_short(?OPT_INET);
-        {list, T} -> list_to_binary([encode_short(?OPT_LIST), encode_option(T)]);
-        {map, K, V} ->  list_to_binary([encode_short(?OPT_MAP), encode_option(K), encode_option(V)]);
-        {set, T} -> list_to_binary([encode_short(?OPT_SET), encode_option(T)]);
+
+        {list, T} ->
+            list_to_binary([encode_short(?OPT_LIST), encode_option(T)]);
+
+        {map, K, V} ->
+            list_to_binary([encode_short(?OPT_MAP), encode_option(K), encode_option(V)]);
+
+        {set, T} ->
+            list_to_binary([encode_short(?OPT_SET), encode_option(T)]);
+
+        UDT = #tdm_udt{} ->
+            encode_udt(UDT);
+
+        {tuple, L} ->
+            encode_tuple(L);
+
         _ -> throw({unsupported_value_type, Type})
     end.
 
+parse_udt_int(Bin, 0, Acc) -> {Acc, Bin};
+parse_udt_int(Bin, Count, Acc) ->
+    {FieldName, X} = parse_string(Bin),
+    {FieldOpt, X1} = parse_option(X),
+    parse_udt_int(X1, Count - 1, [{FieldName, FieldOpt} | Acc]).
+
+parse_udt(X0) ->
+    {KS, X1} = parse_string(X0),
+    {UdtName, X2} = parse_string(X1),
+    {FieldsCount, X3} = parse_short(X2),
+    {Fields, X4} = parse_udt_int(X3, FieldsCount, []),
+    {#tdm_udt{keyspace = KS, name = UdtName, fields = Fields}, X4}.
+
+parse_tuple(X0) ->
+    {L, X2} = parse_option_list(X0),
+    {{tuple, L}, X2}.
 
 parse_option_list(X)  when is_binary(X)->
     {N, X1} = parse_short(X),
@@ -285,6 +326,11 @@ parse_option_list(X)  when is_binary(X)->
 encode_option_list(X) when is_list(X) ->
     encode_list(X, fun encode_option/1).
 
+encode_tuple(L) ->
+    list_to_binary(lists:foldl(fun(X, Acc) -> [encode_option(X) | Acc] end, [], L)).
+
+encode_udt(#tdm_udt{keyspace = KS, name = Name, fields = Fields}) ->
+    list_to_binary([encode_string(KS), encode_string(Name),encode_option_list(Fields)]).
 
 parse_consistency_level(X) ->
     {R, Rest} = parse_short(X),
@@ -438,15 +484,7 @@ parse_result(#tdm_frame{body = Body}) ->
             end,
             {ID, Metadata, ResultMetadata};
         ?RES_SCHEMA ->
-            {Change, X1} = parse_string(X0),
-            {Keyspace, X2} = parse_string(X1),
-            {Table, _X3} = parse_string(X2),
-            case Change of
-                "CREATED" -> {created, Keyspace, Table};
-                "UPDATED" -> {updated, Keyspace, Table};
-                "DROPPED" -> {dropped, Keyspace, Table};
-                _ -> {Change, Keyspace, Table}
-            end;
+            parse_schema_change(X0);
         _ ->
             {error, {unknown_result_kind, Kind}}
     end.
@@ -568,24 +606,37 @@ parse_event(#tdm_frame{body = Body}) ->
                     {status_change, unknown, Inet}
             end;
         "SCHEMA_CHANGE" ->
-            {ChangeType, X1} = parse_string(X0),
-            {Keyspace, X2} = parse_string(X1),
-            {Table, _Rest} = parse_string(X2),
-            case ChangeType of
-                "CREATED" ->
-                    {schema_change, created, Keyspace, Table};
-                "UPDATED" ->
-                    {schema_change, updated, Keyspace, Table};
-                "DROPPED" ->
-                    {schema_change, dropped, Keyspace, Table};
-                _ ->
-                    {schema_change, unknown, Keyspace, Table}
-            end;
+            parse_schema_change(X0);
         _ ->
             {unknown_event_type, EventType, Body}
     end.
 
-encode_query_flags(#tdm_query_params{bind_values = Bind, skip_metadata = SkipMetadata, page_size = PageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
+parse_schema_change(X) ->
+    {ChangeType, X1} = parse_string(X),
+    Change = case ChangeType of
+        "CREATED" -> created;
+        "UPDATED" -> updated;
+        "DROPPED" -> dropped;
+        _ -> {unknown, ChangeType}
+    end,
+    {Target, X2} = parse_string(X1),
+    case Target of
+        "KEYSPACE" ->
+            {Keyspace, _Rest} = parse_string(X2),
+            {schema_change, Change, keyspace, Keyspace};
+        "TABLE" ->
+            {Keyspace, X3} = parse_string(X2),
+            {Table, _Rest} = parse_string(X3),
+            {schema_change, Change, table, Keyspace, Table};
+        "TYPE" ->
+            {Keyspace, X3} = parse_string(X2),
+            {Type, _Rest} = parse_string(X3),
+            {schema_change, Change, type, Keyspace, Type};
+        _ ->
+            {schema_change, unknown, Target}
+    end.
+
+encode_query_flags(#tdm_query_params{bind_values = Bind, skip_metadata = SkipMetadata, page_size = PageSize, paging_state = PagingState, serial_consistency = SerialConsistency, named_values = NamedValues, timestamp = Timestamp}) ->
     F0 = case Bind of
         undefined -> 0;
         [] -> 0;
@@ -595,17 +646,20 @@ encode_query_flags(#tdm_query_params{bind_values = Bind, skip_metadata = SkipMet
     F2 = if PageSize =:= undefined -> 0; true -> 16#04 end,
     F3 = if PagingState =:= undefined -> 0; true -> 16#08 end,
     F4 = if SerialConsistency =:= undefined -> 0; true -> 16#10 end,
-    <<(F0 bor F1 bor F2 bor F3 bor F4):8/big-unsigned-integer>>.
+    F5 = if Timestamp =:= undefined -> 0; true -> 16#20 end,
+    F6 = if NamedValues =/= true -> 0; true -> 16#40 end,
+    <<(F0 bor F1 bor F2 bor F3 bor F4 bor F5 bor F6):8/big-unsigned-integer>>.
 
 
-encode_query_params(Params = #tdm_query_params{consistency_level = Consistency, bind_values = Bind, page_size = ResultPageSize, paging_state = PagingState, serial_consistency = SerialConsistency}) ->
+encode_query_params(Params = #tdm_query_params{consistency_level = Consistency, bind_values = Bind, page_size = ResultPageSize, paging_state = PagingState, serial_consistency = SerialConsistency, timestamp = Timestamp}) ->
     CL = encode_consistency_level(Consistency),
     Flags = encode_query_flags(Params),
+    TS = if Timestamp =:= undefined -> <<>>; true -> encode_long(Timestamp) end,
     Vars = encode_values(Bind),
     RPS = if ResultPageSize =:= undefined -> <<>>; true -> encode_int(ResultPageSize) end,
     SCL = if SerialConsistency =:= undefined -> <<>>; true -> encode_consistency_level(SerialConsistency) end,
     PS = if PagingState =:= undefined -> <<>>; true -> encode_bytes(PagingState) end,
-    <<CL/binary,Flags/binary,Vars/binary,RPS/binary,PS/binary,SCL/binary>>.
+    <<CL/binary, Flags/binary, Vars/binary, RPS/binary, PS/binary, SCL/binary, TS/binary>>.
 
 
 encode_batch_type(BatchType) ->
@@ -616,28 +670,45 @@ encode_batch_type(BatchType) ->
     end,
     encode_byte(R).
 
-encode_batch_query(#tdm_batch_query{batch_type = BatchType, queries = Queries, consistency_level = Consistency}) ->
+encode_batch_query_flags(#tdm_batch_query{serial_consistency = SC, timestamp = TS, named_values = NV}) ->
+    F1 = if SC =:= undefined -> 0; true -> 16#10 end,
+    F2 = if TS =:= undefined -> 0; true -> 16#20 end,
+    F3 = if NV =/= true -> 0; true -> 16#40 end,
+    <<(F1 bor F2 bor F3):8/big-unsigned-integer>>.
+
+encode_batch_query(Batch = #tdm_batch_query{batch_type = BatchType, queries = Queries, consistency_level = Consistency, serial_consistency = SerialConsistency, timestamp = Timestamp}) ->
     BT = encode_batch_type(BatchType),
     QC = encode_short(length(Queries)),
     QL = list_to_binary(lists:map(fun encode_single_query/1, Queries)),
     CL = encode_consistency_level(Consistency),
-    <<BT/binary,QC/binary,QL/binary,CL/binary>>.
+    FL = encode_batch_query_flags(Batch),
+    SC = if SerialConsistency =/= undefined -> encode_consistency_level(SerialConsistency); true -> <<>> end,
+    TS = if Timestamp =/= undefined -> encode_long(Timestamp); true -> <<>> end,
+    <<BT/binary, QC/binary, QL/binary, CL/binary, FL/binary, SC/binary, TS/binary>>.
 
+-spec encode_single_query({IdOrQuery :: binary() | string(), Binds :: teledamus:bind_variables()}) -> binary().
 encode_single_query({ID, Binds}) when is_binary(ID), is_list(Binds) ->  %% prepared statement
     B = encode_values(Binds),
     Q = encode_short_bytes(ID),
-    <<1:8/big-signed-integer,Q/binary,B/binary>>;
+    <<1:8/big-signed-integer, Q/binary, B/binary>>;
 encode_single_query({Query, Binds}) when is_list(Query), is_list(Binds) -> %% query statement
     Q = encode_long_string(Query),
     B = encode_values(Binds),
-    <<0:8/big-signed-integer,Q/binary,B/binary>>.
+    <<0:8/big-signed-integer, Q/binary, B/binary>>.
 
+
+encode_bind_value({Name, Value}) when is_list(Name) ->
+    S = encode_string(Name),
+    V = tdm_cql_types:encode_t(Value),
+    <<S/binary, V/binary>>;
+encode_bind_value(X) ->
+    tdm_cql_types:encode_t(X).
+
+
+-spec encode_values(BindValues :: teledamus:bind_variables()) -> binary().
 encode_values(BindValues) ->
     N = encode_short(length(BindValues)),
-
-    V = list_to_binary(lists:map(fun(X) ->
-        tdm_cql_types:encode_t(X)
-    end,  BindValues)),
+    V = list_to_binary(lists:map(fun encode_bind_value/1, BindValues)),
     <<N/binary,V/binary>>.
 
 

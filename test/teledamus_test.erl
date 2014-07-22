@@ -98,9 +98,9 @@ create_drop_ks_test_() ->
         timer:sleep(100),
         D = teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
         timer:sleep(100),
-        [?_assertEqual({created,"test", []}, KS),
+        [?_assertEqual({schema_change, created, keyspace, "test"}, KS),
             ?_assertEqual({keyspace, "test"}, U),
-            ?_assertEqual({dropped,"test", []}, D)]
+            ?_assertEqual({schema_change, dropped, keyspace, "test"}, D)]
     end}.
 
 create_drop_ts_test_() ->
@@ -111,8 +111,8 @@ create_drop_ts_test_() ->
         C = teledamus:query(Connection, "CREATE TABLE test (test text PRIMARY KEY)", #tdm_query_params{}, 3000),
         D = teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
-        [?_assertEqual({created,"test", "test"}, C),
-            ?_assertEqual({dropped,"test", "test"}, D)]
+        [?_assertEqual({schema_change, created, table, "test", "test"}, C),
+            ?_assertEqual({schema_change, dropped, table,"test", "test"}, D)]
     end}.
 
 
@@ -402,7 +402,7 @@ decimal_neg_datatype_test_() ->
     {setup, fun start/0, fun stop/1, fun(Connection) ->
         teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "CREATE TABLE test (
+        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
                                   a decimal PRIMARY KEY
                                  )", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{decimal, #tdm_decimal{scale = 2, value = -123456789012345678901234567890123456789012345678901234567890}}]}, 3000),
@@ -412,20 +412,37 @@ decimal_neg_datatype_test_() ->
         [?_assertEqual([[#tdm_decimal{scale = 2, value = -123456789012345678901234567890123456789012345678901234567890}]], Rows)]
     end}.
 
+list_datatype_read_test_() ->
+    {"list datatype test"},
+    {setup, fun start/0, fun stop/1, fun(Connection) ->
+        teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
+        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
+                                  a int PRIMARY KEY,
+                                  b list<int>
+                                 )", #tdm_query_params{}, 3000),
+        OK = teledamus:query(Connection, "INSERT INTO test(a, b) values(1, [1, 2,3])", #tdm_query_params{}, 3000),
+        {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
+        [?_assertEqual(ok, OK), ?_assertEqual([[[1, 2, 3]]], Rows)]
+    end}.
+
+
 list_datatype_test_() ->
     {"list datatype test"},
     {setup, fun start/0, fun stop/1, fun(Connection) ->
         teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "CREATE TABLE test (
+        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
                                   a int PRIMARY KEY,
                                   b list<int>
                                  )", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{list, int}, [1, 2, 3]}]}, 3000),
+        OK = teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{list, int}, [1, 2, 3]}]}, 3000),
         {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
-        [?_assertEqual([[[1, 2, 3]]], Rows)]
+        [?_assertEqual(ok, OK), ?_assertEqual([[[1, 2, 3]]], Rows)]
     end}.
 
 set_datatype_test_() ->
@@ -437,11 +454,11 @@ set_datatype_test_() ->
                                   a int PRIMARY KEY,
                                   b set<int>
                                  )", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{set, int}, [1, 2, 3]}]}, 3000),
+        OK = teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{set, int}, [1, 2, 3]}]}, 3000),
         {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
-        [?_assertEqual([[[1, 2, 3]]], Rows)]
+        [?_assertEqual(ok, OK), ?_assertEqual([[[1, 2, 3]]], Rows)]
     end}.
 
 
@@ -454,11 +471,11 @@ map_datatype_test_() ->
                                   a int PRIMARY KEY,
                                   b map<ascii, int>
                                  )", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{map, ascii, int}, [{"a", 1}, {"b", 2}, {"c", 3}]}]}, 3000),
+        OK = teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{bind_values = [{{map, ascii, int}, [{"a", 1}, {"b", 2}, {"c", 3}]}]}, 3000),
         {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
-        [?_assertEqual([[[{"a", 1}, {"b", 2}, {"c", 3}]]], Rows)]
+        [?_assertEqual(ok, OK), ?_assertEqual([[[{"a", 1}, {"b", 2}, {"c", 3}]]], Rows)]
     end}.
 
 
@@ -475,7 +492,7 @@ cassandra_events_test_() ->
         timer:sleep(1000),
         Res = gen_event:call(cassandra_events, test_event_handler, get_events, 3000),
         gen_event:delete_handler(cassandra_events, test_event_handler, []),
-        [?_assertEqual([{schema_change, dropped, "test", ""}, {schema_change, created, "test", ""}], Res)]
+        [?_assertEqual([{schema_change, dropped, keyspace, "test"}, {schema_change, created, keyspace, "test"}], Res)]
     end}.
 
 

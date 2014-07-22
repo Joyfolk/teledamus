@@ -66,15 +66,15 @@ decode(Type, Value, IntSize) ->
                 inet -> decode_inet(D);
 
                 {list, ValueType} ->
-                    <<L:16/big-unsigned-integer, X0/binary>> = D,
+                    <<L:32/big-unsigned-integer, X0/binary>> = D,
                     decode_collection(X0, L, ValueType);
 
                 {map, KeyType, ValueType} ->
-                    <<L:16/big-unsigned-integer, X0/binary>> = D,
+                    <<L:32/big-unsigned-integer, X0/binary>> = D,
                     decode_map(X0, L, KeyType, ValueType);
 
                 {set, ValueType} ->
-                    <<L:16/big-unsigned-integer, X0/binary>> = D,
+                    <<L:32/big-unsigned-integer, X0/binary>> = D,
                     decode_collection(X0, L, ValueType);
 
                 _ ->
@@ -115,18 +115,18 @@ encode(Type, Value, IntSize) ->
                 inet -> encode_inet(Value);
 
                 {list, ValueType} ->
-                    L = encode_uint(length(Value), short),
-                    C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
+                    L = encode_int(length(Value), int),
+                    C = lists:map(fun(X) -> encode(ValueType, X, int) end, Value),
                     list_to_binary([L| C]);
 
                 {map, KeyType, ValueType} ->
-                    L = encode_uint(length(Value), short),
-                    C = lists:map(fun({K, V}) -> [encode(KeyType, K, short), encode(ValueType, V, short)] end, Value),
+                    L = encode_int(length(Value), int),
+                    C = lists:map(fun({K, V}) -> [encode(KeyType, K, int), encode(ValueType, V, int)] end, Value),
                     list_to_binary([L| C]);
 
                 {set, ValueType} ->
-                    L = encode_uint(length(Value), short),
-                    C = lists:map(fun(X) -> encode(ValueType, X, short) end, Value),
+                    L = encode_int(length(Value), int),
+                    C = lists:map(fun(X) -> encode(ValueType, X, int) end, Value),
                     list_to_binary([L| C]);
 
                 _ ->
@@ -150,7 +150,7 @@ decode_collection(X, N, T, Acc) ->
         N =< 0 ->
             {Acc, X};
         true ->
-            {V, X1} = decode(T, X, short),
+            {V, X1} = decode(T, X, int),
 %%       <<L:32, VX:L/binary-unit:8, X1>> = X,
 %% 			{V, _R} = decode(T, VX),
 %%       {V, X1},
@@ -168,8 +168,8 @@ decode_map(X, N, K, V, Acc) ->
         N =< 0 ->
             {Acc, X};
         true ->
-            {KV, X1} = decode(K, X, short),
-            {VV, X2} = decode(V, X1, short),
+            {KV, X1} = decode(K, X, int),
+            {VV, X2} = decode(V, X1, int),
             decode_map(X2, N - 1, K, V, [{KV, VV} | Acc])
     end.
 

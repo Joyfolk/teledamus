@@ -15,25 +15,25 @@ parse_flags_test() ->
     ?assertEqual(#tdm_flags{compressing = true, tracing = false}, tdm_native_parser:parse_flags(<<1>>)).
 
 parse_header_test() ->
-    H = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37},
-    ?assertEqual(<<0:1,2:7,1:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H)),
-    ?assertEqual(<<1:1,3:7,1:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{type = response, version = 3})),
-    ?assertEqual(<<0:1,2:7,3:8,37:8,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}})),
-    ?assertEqual(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{opcode = 21, stream = -1})),
-    ?assertEqual(H, tdm_native_parser:parse_frame_header(<<0:1,2:7,1:8,37:8,12:8>>)),
-    ?assertEqual(H#tdm_header{type = response, version = 3}, tdm_native_parser:parse_frame_header(<<1:1,3:7,1:8,37:8,12:8>>)),
-    ?assertEqual(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}}, tdm_native_parser:parse_frame_header(<<0:1,2:7,3:8,37:8,12:8>>)),
-    ?assertEqual(H#tdm_header{opcode = 21, stream = -1}, tdm_native_parser:parse_frame_header(<<0:1,2:7,1:8,-1:8/big-signed-integer,21:8>>)).
+    H = #tdm_header{type = request, version = 3, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37},
+    ?assertEqual(<<0:1,3:7,1:8,37:16,12:8>>, tdm_native_parser:encode_frame_header(H)),
+    ?assertEqual(<<1:1,3:7,1:8,37:16,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{type = response})),
+    ?assertEqual(<<0:1,3:7,3:8,37:16,12:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}})),
+    ?assertEqual(<<0:1,3:7,1:8,-1:16/big-signed-integer,21:8>>, tdm_native_parser:encode_frame_header(H#tdm_header{opcode = 21, stream = -1})),
+    ?assertEqual(H, tdm_native_parser:parse_frame_header(<<0:1,3:7,1:8,37:16,12:8>>)),
+    ?assertEqual(H#tdm_header{type = response, version = 2}, tdm_native_parser:parse_frame_header(<<1:1,2:7,1:8,37:16,12:8>>)),
+    ?assertEqual(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}}, tdm_native_parser:parse_frame_header(<<0:1,3:7,3:8,37:16,12:8>>)),
+    ?assertEqual(H#tdm_header{opcode = 21, stream = -1}, tdm_native_parser:parse_frame_header(<<0:1,3:7,1:8,-1:16/big-signed-integer,21:8>>)).
 
 
 parse_frame_test() ->
-    F = #tdm_frame{header = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = false, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
-    ?assertEqual(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, tdm_native_parser:encode_frame(F, none)),
-    ?assertEqual(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<1, 2, 3>>}, none)),
-    ?assertEqual({F#tdm_frame{length = 0}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, none)),
-    ?assertEqual({F#tdm_frame{length = 0}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer,1,2,3>>, none)),
-    ?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3>>, none)),
-    ?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<4,5>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,3:32/big-unsigned-integer,1,2,3,4,5>>, none)).
+    F = #tdm_frame{header = #tdm_header{type = request, version = 3, flags = #tdm_flags{compressing = false, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
+    ?assertEqual(<<0:1,3:7,0:8,37:16,12:8,0:32/big-unsigned-integer>>, tdm_native_parser:encode_frame(F, none)),
+    ?assertEqual(<<0:1,3:7,0:8,37:16,12:8,3:32/big-unsigned-integer,1,2,3>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<1, 2, 3>>}, none)),
+    ?assertEqual({F#tdm_frame{length = 0}, <<>>}, tdm_native_parser:parse_frame(<<0:1,3:7,0:8,37:16,12:8,0:32/big-unsigned-integer>>, none)),
+    ?assertEqual({F#tdm_frame{length = 0}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,3:7,0:8,37:16,12:8,0:32/big-unsigned-integer,1,2,3>>, none)),
+    ?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<>>}, tdm_native_parser:parse_frame(<<0:1,3:7,0:8,37:16,12:8,3:32/big-unsigned-integer,1,2,3>>, none)),
+    ?assertEqual({F#tdm_frame{length = 3, body= <<1,2,3>>}, <<4,5>>}, tdm_native_parser:parse_frame(<<0:1,3:7,0:8,37:16,12:8,3:32/big-unsigned-integer,1,2,3,4,5>>, none)).
 
 parse_simple_datatypes_test() ->
     % int
@@ -190,9 +190,9 @@ parse_row_test() ->
     F = #tdm_frame{header = #tdm_header{type = request, version = 2, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37}, body = <<>>},
     ?assertEqual(ok, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_VOID:32>>})),
     ?assertEqual({keyspace, "abc"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_KEYSPACE:32,3:16,97,98,99>>})),
-    ?assertEqual({created, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"CREATED",3:16,"Abc",3:16,"Def">>})),
-    ?assertEqual({updated, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"UPDATED",3:16,"Abc",3:16,"Def">>})),
-    ?assertEqual({dropped, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"DROPPED",3:16,"Abc",3:16,"Def">>})),
+    ?assertEqual({schema_change, created, keyspace, "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"CREATED",8:16,"KEYSPACE",3:16,"Def">>})),
+    ?assertEqual({schema_change, updated, table, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"UPDATED",5:16,"TABLE",3:16,"Abc",3:16,"Def">>})),
+    ?assertEqual({schema_change, dropped, type, "Abc", "Def"}, tdm_native_parser:parse_result(F#tdm_frame{body = <<?RES_SCHEMA:32,7:16,"DROPPED",4:16,"TYPE",3:16,"Abc",3:16,"Def">>})),
     M = <<1:32,3:32, 3:16,"abc", 2:16,"de", 1:16,"a",2:16, 2:16,"bc",4:16, 3:16,"def",1:16>>,
     R = <<3:32, 4:32,1:32,1:32,1:8,4:32,"abcd", 4:32,2:32,1:32,1:8,4:32,"efgh", 4:32,3:32,1:32,0:8,4:32,"klmn">>, %%
     ?assertEqual({[{"abc", "de", "a", bigint}, {"abc", "de", "bc", boolean}, {"abc", "de", "def", ascii}], undefined,
@@ -207,9 +207,9 @@ parse_event_test() ->
     ?assertEqual({topology_change, removed_node, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<15:16,"TOPOLOGY_CHANGE", 12:16,"REMOVED_NODE", 9:16,"localhost">>})),
     ?assertEqual({status_change, node_up, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"STATUS_CHANGE", 2:16,"UP", 9:16,"localhost">>})),
     ?assertEqual({status_change, node_down, "localhost"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"STATUS_CHANGE", 4:16,"DOWN", 9:16,"localhost">>})),
-    ?assertEqual({schema_change, created, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"CREATED", 2:16,"KS", 4:16,"Test">>})),
-    ?assertEqual({schema_change, updated, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"UPDATED", 2:16,"KS", 4:16,"Test">>})),
-    ?assertEqual({schema_change, dropped, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"DROPPED", 2:16,"KS", 4:16,"Test">>})),
+    ?assertEqual({schema_change, created, keyspace, "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"CREATED", 8:16,"KEYSPACE", 4:16,"Test">>})),
+    ?assertEqual({schema_change, updated, table, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"UPDATED", 5:16, "TABLE", 2:16,"KS", 4:16,"Test">>})),
+    ?assertEqual({schema_change, dropped, type, "KS", "Test"}, tdm_native_parser:parse_event(F#tdm_frame{body = <<13:16,"SCHEMA_CHANGE", 7:16,"DROPPED", 4:16, "TYPE", 2:16,"KS", 4:16,"Test">>})),
     ok.
 
 encode_query_flags_test() ->
@@ -245,11 +245,10 @@ encode_query_test() ->
     ok.
 
 encode_batch_query_test() ->
-%% 	todo:
     B = #tdm_batch_query{batch_type = logged, consistency_level = one, queries = [{"SELECT * from system.schema_keyspaces WHERE name = ?", [{ascii, "ks_info"}]}, {<<1,2,3>>, [{ascii, "ks_info"}]}]},
-    assert_equal_binary(<<0, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B)),
-    assert_equal_binary(<<1, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = unlogged})),
-    assert_equal_binary(<<2, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = counter})),
+    assert_equal_binary(<<0, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16, 0>>, tdm_native_parser:encode_batch_query(B)),
+    assert_equal_binary(<<1, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16, 0>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = unlogged})),
+    assert_equal_binary(<<2, 2:16, 0,52:32,"SELECT * from system.schema_keyspaces WHERE name = ?",1:16,7:32,"ks_info", 1,3:16,1,2,3,1:16,7:32,"ks_info", 1:16, 0>>, tdm_native_parser:encode_batch_query(B#tdm_batch_query{batch_type = counter})),
     ok.
 
 
@@ -261,11 +260,11 @@ dummy_unzip(<<1,2,3,Body/binary>>) ->
 
 compression_test() ->
     Flags = #tdm_flags{compressing = true, tracing = false},
-    Header = #tdm_header{type = request, version = 2, flags = Flags, opcode = 12, stream = 37},
+    Header = #tdm_header{type = request, version = 3, flags = Flags, opcode = 12, stream = 37},
     F = #tdm_frame{header = Header, body = <<>>},
     C = {"test", {tdm_native_parser_test, dummy_zip, dummy_unzip}, 3},
-    ?assertEqual(<<0:1,2:7,1:8,37:8,12:8,0:32>>, tdm_native_parser:encode_frame(F, C)),
-    ?assertEqual(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<4,5,6,7>>}, C)),
-    ?assertEqual({F#tdm_frame{length = 0, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}}, <<>>}, tdm_native_parser:parse_frame(<<0:1,2:7,0:8,37:8,12:8,0:32/big-unsigned-integer>>, C)),
-    ?assertEqual({F#tdm_frame{length = 4, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}, body = <<4,5,6,7>>}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,2:7,1:8,37:8,12:8,7:32,1,2,3,4,5,6,7,1,2,3>>, C)),
+    ?assertEqual(<<0:1,3:7,1:8,37:16,12:8,0:32>>, tdm_native_parser:encode_frame(F, C)),
+    ?assertEqual(<<0:1,3:7,1:8,37:16,12:8,7:32,1,2,3,4,5,6,7>>, tdm_native_parser:encode_frame(F#tdm_frame{body = <<4,5,6,7>>}, C)),
+    ?assertEqual({F#tdm_frame{length = 0, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}}, <<>>}, tdm_native_parser:parse_frame(<<0:1,3:7,0:8,37:16,12:8,0:32/big-unsigned-integer>>, C)),
+    ?assertEqual({F#tdm_frame{length = 4, header = Header#tdm_header{flags = Flags#tdm_flags{compressing = false}}, body = <<4,5,6,7>>}, <<1,2,3>>}, tdm_native_parser:parse_frame(<<0:1,3:7,1:8,37:16,12:8,7:32,1,2,3,4,5,6,7,1,2,3>>, C)),
     ok.

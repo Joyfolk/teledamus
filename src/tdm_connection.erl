@@ -19,7 +19,7 @@
 -define(DEF_STREAM_ETS, default_streams).
 
 
--record(state, {transport = tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
+-record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
     streams :: dict(), host :: list(), port :: pos_integer()}).
 
 
@@ -166,25 +166,26 @@ start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor) -
 %% @end
 %%--------------------------------------------------------------------
 init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) ->
-    RR = case startup(Socket, Credentials, Transport, Compression) of
+    try
+       case startup(Socket, Credentials, Transport, Compression) of
         ok ->
-            try
-                set_active(Socket, Transport),
-                Connection = #tdm_connection{pid = self(), host = Host, port = Port},
-                {ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
-                monitor(process, StreamId),
-                DefStream = #tdm_stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
-                DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
-                ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-                {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
-            catch
-                E: EE ->
-                    {stop, {error, E, EE}}
-            end;
+            set_active(Socket, Transport),
+            Connection = #tdm_connection{pid = self(), host = Host, port = Port},
+            {ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
+            monitor(process, StreamId),
+            DefStream = #tdm_stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
+            DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
+            ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
+            {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}};
         {error, Reason} ->
+            error_logger:error_msg("Failed to start with ~p", [Reason]),
             {stop, Reason}
-    end,
-    RR.
+      end
+    catch
+        E1: EE1 ->
+            error_logger:error_msg("Failed to start with ~p:~p", [E1, EE1]),
+            {stop, {E1, EE1}}
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -246,7 +247,7 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
     case Request of
         {send_frame, Frame} ->
             case Transport of
-                tcp ->
+                gen_tcp ->
                     erlang:port_command(Socket, Frame);
                 _ ->
                     Transport:send(Socket, Frame)
@@ -411,21 +412,19 @@ startup(Socket, Credentials, Transport, Compression) ->
                     authenticate(Socket, Authenticator, Credentials, Transport, Compression);
                 ?OPC_READY ->
                     ok;
-                _ ->
-                    {error, unknown_response_code}
+                OpCode ->
+                    {error, {unknown_response_code, OpCode}}
             end;
         Error ->
             {error, Error}
     end.
 
 read_frame(Socket, Transport, Compression) ->
-    {ok, Data} = Transport:recv(Socket, 8),
-    <<_Header:4/binary, Length:32/big-unsigned-integer>> = Data,
+    {ok, Data} = Transport:recv(Socket, 9),
+    <<_Header:5/binary, Length:32/big-unsigned-integer>> = Data,
     {ok, Body} = if
-        Length =/= 0 ->
-            Transport:recv(Socket, Length);
-        true ->
-            {ok, <<>>}
+        Length =/= 0 -> Transport:recv(Socket, Length);
+        true -> {ok, <<>>}
     end,
     F = <<Data/binary,Body/binary>>,
     tdm_native_parser:parse_frame(F, Compression).
