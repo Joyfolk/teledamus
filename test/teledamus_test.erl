@@ -514,10 +514,43 @@ udt_datatype_test_() ->
         }, 3000),
         {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
-        teledamus:query(Connection, "DROP TYPE TestType"),
+        teledamus:query(Connection, "DROP TYPE test_type"),
         teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
         [?_assertEqual(ok, OK), ?_assertEqual([[[{"fld1", true}, {"fld2", 4}, {"fld3", "test"}]]], Rows)]
     end}.
+
+
+udt_datatype_complex_test_() ->
+    {"UDT test"},
+    {setup, fun start/0, fun stop/1, fun(Connection) ->
+        teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
+        {schema_change, created, type, "test", "test_type"} = teledamus:query(Connection, "CREATE TYPE test_type(fld1 int, fld2 map<int, boolean>)"),
+        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
+                                  a int PRIMARY KEY,
+                                  b map<int, test_type>
+                                 )", #tdm_query_params{}, 3000),
+        OK = teledamus:query(Connection, "INSERT INTO test(a, b) values(1, ?)", #tdm_query_params{
+            bind_values = [
+                {
+                    {map, int, #tdm_udt{keyspace = "test", name = "test_type", fields = [{"fld1", int}, {"fld2", {map, int, boolean}}]}},
+                    [
+                        {1, [{"fld1", 4}, {"fld2", [{1, true}, {2, false}]}]},
+                        {2, [{"fld1", 3}, {"fld2", [{2, true}, {3, false}]}]}
+                    ]
+                }
+            ]
+        }, 3000),
+        {_, _, Rows} = teledamus:query(Connection, "SELECT b FROM test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "DROP TYPE test_type"),
+        teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
+        [?_assertEqual(ok, OK), ?_assertEqual([[[
+            {1, [{"fld1", 4}, {"fld2", [{1, true}, {2, false}]}]},
+            {2, [{"fld1", 3}, {"fld2", [{2, true}, {3, false}]}]}
+        ]]], Rows)]
+    end}.
+
 
 cassandra_events_test_() ->
     {"events handler test"},
