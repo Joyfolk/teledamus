@@ -77,6 +77,12 @@ decode(Type, Value, IntSize) ->
                     <<L:32/big-unsigned-integer, X0/binary>> = D,
                     decode_collection(X0, L, ValueType);
 
+                #tdm_udt{fields = Fields} ->
+                    decode_udt(Fields, D);
+
+                {tuple, ValueTypes} ->
+                    decode_tuple(ValueTypes, D);
+
                 _ ->
                     throw({unsupported_type, Type})
             end,
@@ -129,6 +135,26 @@ encode(Type, Value, IntSize) ->
                     C = lists:map(fun(X) -> encode(ValueType, X, int) end, Value),
                     list_to_binary([L| C]);
 
+                #tdm_udt{fields = Fields, keyspace = KS, name = Name} ->
+                    L = lists:map(fun({N, T}) ->
+                        case proplists:get_value(N, Value) of
+                            undefined ->
+                               throw({udt_field_not_found, string:join([KS, Name], "."), N});
+                            X ->
+                               encode(T, X)
+                        end
+                    end, Fields),
+                    list_to_binary(L);
+
+                {tuple, ValueTypes} ->
+                    case length(ValueTypes) =:= length(Value) of
+                        true ->
+                            L = lists:zipwith(fun(T, X) -> encode(T, X, int) end, ValueTypes, Value),
+                            list_to_binary(L);
+                        false ->
+                            throw({incompatible_tuple_size, {required, length(ValueTypes)}, {avail, length(Value)}})
+                    end;
+
                 _ ->
                     throw({unsupported_type, Type})
             end,
@@ -138,6 +164,25 @@ encode(Type, Value, IntSize) ->
         true ->
             encode_int(-1, IntSize)
     end.
+
+
+decode_udt_int([], _X, Acc) -> Acc;
+decode_udt_int([{N, T} | Fields], X, Acc) ->
+    {V, X1} = decode(T, X, int),
+    decode_udt_int(Fields, X1, [{N, V} | Acc]).
+
+-spec decode_udt([teledamus:cql_type()], binary()) -> [any()].
+decode_udt(Fields, X) ->
+    lists:reverse(decode_udt_int(Fields, X, [])).
+
+decode_tuple_int([], _X, Acc) -> Acc;
+decode_tuple_int([T | Types], X, Acc) ->
+    {V, X1} = decode(T, X, int),
+    decode_tuple_int(Types, X1, [V | Acc]).
+
+-spec decode_tuple([teledamus:cql_type()], binary()) -> [any()].
+decode_tuple(Types, X) ->
+    lists:reverse(decode_tuple_int(Types, X, [])).
 
 -spec decode_collection(X :: binary(), N :: non_neg_integer(), T :: teledamus:cql_type()) -> [any()].
 decode_collection(X, N, T)  ->

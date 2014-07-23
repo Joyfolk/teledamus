@@ -24,10 +24,18 @@ encode_test() ->
     ?assertEqual(<<8:32, 1,2,3,4,5,6,7,8>>, tdm_cql_types:encode(timeuuid, <<1,2,3,4,5,6,7,8>>)),
     ?assertEqual(<<4:32, 127,0,0,1>>, tdm_cql_types:encode(inet, #tdm_inet{ip = {127,0,0,1}})), %% , port = 8080
     ?assertEqual(<<16:32, 127:16,0:16,0:16,1:16,1:16,2:16,3:16,4:16>>, tdm_cql_types:encode(inet, #tdm_inet{ip = {127,0,0,1,1,2,3,4}})),  % , port = 8080
+
     ?assertEqual(<<28:32, 2:32, 8:32,12:64, 8:32,13:64>>, tdm_cql_types:encode({list, bigint}, [12, 13])),
     ?assertEqual(<<28:32, 3:32, 4:32,1:32, 4:32,3:32, 4:32,5:32>>, tdm_cql_types:encode({list, int}, [1, 3, 5])),
     ?assertEqual(<<28:32, 3:32, 4:32,1:32, 4:32,3:32, 4:32,5:32>>, tdm_cql_types:encode({set, int}, [1, 3, 5])),
     ?assertEqual(<<30:32, 2:32, 4:32,1:32, 1:32,1, 4:32,3:32, 1:32,0>>, tdm_cql_types:encode({map, int, boolean}, [{1, true}, {3, false}])),
+
+    ?assertEqual(<<21:32, 4:32,2:32, 1:32,1:8, 4:32,"test" >>, tdm_cql_types:encode(
+        #tdm_udt{keyspace = "KS", name = "Test", fields = [{"fld1", int}, {"fld2", boolean}, {"fld3", ascii}]},
+        [{"fld1", 2}, {"fld2", true}, {"fld3", "test"}])
+    ),
+
+    ?assertEqual(<<21:32, 4:32,3:32, 1:32,1:8, 4:32,"test">>, tdm_cql_types:encode({tuple, [int, boolean, ascii]}, [3, true, "test"])),
     ok.
 
 decode_test() ->
@@ -55,6 +63,9 @@ decode_test() ->
     ?assertEqual({[1, 3, 5], <<>>}, tdm_cql_types:decode({list, int}, <<28:32, 3:32, 4:32,1:32, 4:32,3:32, 4:32,5:32>>)),
     ?assertEqual({[1, 3, 5], <<>>}, tdm_cql_types:decode({set, int},  <<28:32, 3:32, 4:32,1:32, 4:32,3:32, 4:32,5:32>>)),
     ?assertEqual({[{1, true}, {3, false}], <<>>}, tdm_cql_types:decode({map, int, boolean}, <<30:32, 2:32, 4:32,1:32, 1:32,1, 4:32,3:32, 1:32,0>>)),
+
+    ?assertEqual({[{"fld1", 2}, {"fld2", true}, {"fld3", "test"}], <<>>}, tdm_cql_types:decode(#tdm_udt{keyspace = "KS", name = "Test", fields = [{"fld1", int}, {"fld2", boolean}, {"fld3", ascii}]}, <<21:32, 4:32,2:32, 1:32,1:8, 4:32,"test">>)),
+    ?assertEqual({[3, true, "test"], <<>>}, tdm_cql_types:decode({tuple, [int, boolean, ascii]}, <<21:32, 4:32,3:32, 1:32,1:8, 4:32,"test">>)),
     ok.
 
 helpers_test() ->

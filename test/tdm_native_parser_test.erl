@@ -134,6 +134,19 @@ parse_complex_datatypes_test() ->
     ?assertEqual({{list, int}, <<1,2,3>>}, tdm_native_parser:parse_option(<<?OPT_LIST:16, ?OPT_INT:16, 1,2,3>>)),
     ?assertEqual({{map, boolean, text}, <<1,2,3>>}, tdm_native_parser:parse_option(<<?OPT_MAP:16, ?OPT_BOOLEAN:16, ?OPT_TEXT:16, 1,2,3>>)),
     ?assertEqual({{set, ascii}, <<1,2,3>>}, tdm_native_parser:parse_option(<<?OPT_SET:16, ?OPT_ASCII:16, 1,2,3>>)),
+
+    ?assertEqual({
+        #tdm_udt{
+            keyspace = "TestKS",
+            name = "Test",
+            fields = [{"Fld1", int}, {"Fld2", float}, {"Fld3", boolean}]
+        }, <<1,2,3>>
+    }, tdm_native_parser:parse_option(<<?OPT_UDT:16, 6:16,"TestKS",4:16,"Test",3:16, 4:16,"Fld1",?OPT_INT:16, 4:16,"Fld2",?OPT_FLOAT:16, 4:16,"Fld3",?OPT_BOOLEAN:16, 1,2,3>>)),
+
+    ?assertEqual(
+        {{tuple, [int, float, boolean]}, <<1,2,3>>},
+        tdm_native_parser:parse_option(<<?OPT_TUPLE:16, 3:16, ?OPT_INT:16,?OPT_FLOAT:16,?OPT_BOOLEAN:16, 1,2,3>>)
+    ),
     ok.
 
 

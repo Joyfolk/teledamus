@@ -9,6 +9,7 @@
 -export([parse_consistency_level/1, encode_consistency_level/1]).
 -export([parse_string_map/1, encode_string_map/1, parse_string_multimap/1, encode_string_multimap/1]).
 -export([parse_option/1, encode_option/1, parse_option_list/1, encode_option_list/1]).
+-export([parse_udt/1, parse_tuple/1]).
 -export([parse_error/1, parse_result/1, parse_metadata/1]).
 -export([encode_query_flags/1, encode_query_params/1, encode_batch_query/1, parse_event/1, encode_query/2]).
 -export([encode_event_types/1]).
@@ -313,7 +314,7 @@ parse_udt(X0) ->
     {UdtName, X2} = parse_string(X1),
     {FieldsCount, X3} = parse_short(X2),
     {Fields, X4} = parse_udt_int(X3, FieldsCount, []),
-    {#tdm_udt{keyspace = KS, name = UdtName, fields = Fields}, X4}.
+    {#tdm_udt{keyspace = KS, name = UdtName, fields = lists:reverse(Fields)}, X4}.
 
 parse_tuple(X0) ->
     {L, X2} = parse_option_list(X0),
@@ -330,7 +331,7 @@ encode_tuple(L) ->
     list_to_binary(lists:foldl(fun(X, Acc) -> [encode_option(X) | Acc] end, [], L)).
 
 encode_udt(#tdm_udt{keyspace = KS, name = Name, fields = Fields}) ->
-    list_to_binary([encode_string(KS), encode_string(Name),encode_option_list(Fields)]).
+    list_to_binary([encode_string(KS), encode_string(Name), encode_option_list(Fields)]).
 
 parse_consistency_level(X) ->
     {R, Rest} = parse_short(X),
