@@ -5,7 +5,7 @@
 %% API
 -export([start/3, start/4, stop/2, stop/1]).
 
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/4]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/4, close/2]).
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
 -include_lib("teledamus.hrl").
@@ -177,6 +177,10 @@ to_cache(#tdm_stream{connection = #tdm_connection{host = Host, port = Port}}, Qu
     tdm_stmt_cache:to_cache({Host, Port, Query}, Id).
 
 
+-spec close(teledamus:stream(), Timeout :: timeout()) -> ok.
+close(Stream, Timeout) ->
+    call(Stream, stop, Timeout).
+
 
 init(Connection, StreamId, Compression, ChannelMonitor) ->
     proc_lib:init_ack({ok, self()}),
@@ -198,6 +202,8 @@ loop(State) ->
                         exit(normal)
                 end
             catch
+                exit: normal ->
+                    exit(normal);
                 E: EE ->
                     error_logger:error_msg("~p:~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()]),
                     exit({E, EE})
@@ -332,6 +338,8 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
                 {reply, Tag, X} ->
                     erlang:demonitor(Mref, [flush]),
                     X;
+                stop ->
+                    ok;
                 {'DOWN', _MonitorRef, _Type, _Object, normal} ->
                     ok;
                 {'DOWN', _MonitorRef, _Type, _Object, Info} ->
