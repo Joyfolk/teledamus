@@ -130,8 +130,7 @@ handle_call(Request, From, State) ->
             #tdm_connection{pid = Pid} = Connection,
             case is_process_alive(Pid) of
                 true ->
-                    Socket = tdm_connection:get_socket(Connection),
-                    Transport:close(Socket),
+                    tdm_connection:close(Connection, 5000),
                     {reply, ok, State};
                 false ->
                     {reply, {error, connection_is_not_alive}, State}

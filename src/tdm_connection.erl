@@ -10,7 +10,7 @@
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
     new_stream/2, release_stream/2, release_stream_async/1, send_frame/2, get_default_stream/1]).
 
--export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
+-export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3, close/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -136,6 +136,11 @@ prepare_ets() ->
         _ -> ?DEF_STREAM_ETS
     end.
 
+-spec close(Con :: teledamus:connection(), Timeout :: timeout()) -> ok.
+close(#tdm_connection{pid = Pid, default_stream = Stream}, Timeout) ->
+    tdm_stream:close(Stream, Timeout),
+    gen_server:call(Pid, stop),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -195,7 +200,7 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} | {reply, Reply, State, Timeout} | {noreply, State} | {noreply, State, Timeout} | {stop, Reason, Reply, State} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(Request, _From, State = #state{socket = Socket, transport = _Transport, compression = Compression, streams = Streams, host = Host, port = Port}) ->
+handle_call(Request, _From, State = #state{socket = Socket, transport = Transport, compression = Compression, streams = Streams, host = Host, port = Port}) ->
     case Request of
         {get_stream, Id} ->
             case dict:find(Id, Streams) of
@@ -226,6 +231,10 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = _Transpo
 
         get_socket ->
             {reply, State#state.socket, Socket};
+
+        stop ->
+            Transport:close(Socket),
+            {stop, normal, ok, State};
 
         _ ->
             error_logger:error_msg("Unknown request ~p~n", [Request]),
