@@ -5,5 +5,5 @@ teledamus
 
 Teledamus is native (CQL) Erlang client library for Apache Cassandra.
 
-_current version supports CQLv3 only (Cassandra version 2.1.x), for CQLv2 support use branch cql2
+_current version supports CQLv3 only (Cassandra version 2.1.x), for CQLv2 support use branch cql2_
 
