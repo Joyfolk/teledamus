@@ -36,7 +36,7 @@ get_length(Data, IntSize) ->
         short -> 16;
         int -> 32
     end,
-    <<Length:S/unsigned, Rest/binary>> = Data,
+    <<Length:S/signed, Rest/binary>> = Data,
     {Length, Rest}.
 
 -spec decode(teledamus:cql_type(), binary(), int | short) -> {any(), binary()}.
