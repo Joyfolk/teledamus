@@ -19,13 +19,8 @@
 -define(DEF_STREAM_ETS, default_streams).
 
 
-<<<<<<< HEAD
--record(state, {transport = tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
-    streams :: dict(), host :: list(), port :: pos_integer()}).
-=======
 -record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
     streams :: dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference()}).
->>>>>>> b809fad... default stream monitoring fix
 
 
 %%%===================================================================
@@ -177,21 +172,6 @@ start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor) -
 init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) ->
     RR = case startup(Socket, Credentials, Transport, Compression) of
         ok ->
-<<<<<<< HEAD
-            try
-                set_active(Socket, Transport),
-                Connection = #tdm_connection{pid = self(), host = Host, port = Port},
-                {ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
-                monitor(process, StreamId),
-                DefStream = #tdm_stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
-                DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
-                ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-                {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}}
-            catch
-                E: EE ->
-                    {stop, {error, E, EE}}
-            end;
-=======
             set_active(Socket, Transport),
             Connection = #tdm_connection{pid = self(), host = Host, port = Port},
             {ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
@@ -200,7 +180,6 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
             DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
             ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
             {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()), monitor_ref = MonitorRef}};
->>>>>>> b809fad... default stream monitoring fix
         {error, Reason} ->
             {stop, Reason}
     end,
