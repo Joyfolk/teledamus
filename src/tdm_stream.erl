@@ -11,7 +11,7 @@
 -include_lib("teledamus.hrl").
 
 
--record(state, {connection :: teledamus:connection(), id :: teledamus:stream_id(), caller :: term(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol = tdm_cql3 :: tdm_cql2 | tdm_cql3}).
+-record(state, {connection :: teledamus:connection(), id :: teledamus:stream_id(), caller :: term(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol = tdm_cql3 :: tdm_cql1 | tdm_cql2 | tdm_cql3}).
 
 %%%===================================================================
 %%% API
