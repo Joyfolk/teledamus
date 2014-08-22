@@ -20,7 +20,7 @@
 
 
 -record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
-    streams :: dict(), host :: list(), port :: pos_integer()}).
+    streams :: dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference()}).
 
 
 %%%===================================================================
@@ -137,9 +137,8 @@ prepare_ets() ->
     end.
 
 -spec close(Con :: teledamus:connection(), Timeout :: timeout()) -> ok.
-close(#tdm_connection{pid = Pid, default_stream = Stream}, Timeout) ->
-    tdm_stream:close(Stream, Timeout),
-    gen_server:call(Pid, stop),
+close(#tdm_connection{pid = Pid}, Timeout) ->
+    gen_server:call(Pid, {stop, Timeout}),
     ok.
 
 %%--------------------------------------------------------------------
@@ -177,11 +176,11 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
             set_active(Socket, Transport),
             Connection = #tdm_connection{pid = self(), host = Host, port = Port},
             {ok, StreamId} = tdm_stream:start(Connection, ?DEFAULT_STREAM_ID, Compression, ChannelMonitor),
-            monitor(process, StreamId),
+            MonitorRef = monitor(process, StreamId),
             DefStream = #tdm_stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
             DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
             ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-            {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new())}};
+            {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()), monitor_ref = MonitorRef}};
         {error, Reason} ->
             error_logger:error_msg("Failed to start with ~p", [Reason]),
             {stop, Reason}
@@ -201,7 +200,7 @@ init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) 
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} | {reply, Reply, State, Timeout} | {noreply, State} | {noreply, State, Timeout} | {stop, Reason, Reply, State} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(Request, _From, State = #state{socket = Socket, transport = Transport, compression = Compression, streams = Streams, host = Host, port = Port}) ->
+handle_call(Request, _From, State = #state{socket = Socket, transport = Transport, compression = Compression, streams = Streams, host = Host, port = Port, monitor_ref = MonitorRef}) ->
     case Request of
         {get_stream, Id} ->
             case dict:find(Id, Streams) of
@@ -233,7 +232,10 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = Transpor
         get_socket ->
             {reply, State#state.socket, Socket};
 
-        stop ->
+        {stop, Timeout} ->
+            demonitor(MonitorRef, [flush]),
+            DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
+            tdm_stream:close(DefStream, Timeout),
             Transport:close(Socket),
             {stop, normal, ok, State};
 
@@ -322,11 +324,11 @@ handle_info({inet_reply, _, Status}, State) ->
     error_logger:error_msg("Socket error [~p]~n", [Status]),
     {noreply, State};
 
-handle_info({'Down', From, Reason}, State) ->  %% todo
-    error_logger:error_msg("Child killed ~p: ~p, state=~p", [From, Reason, State]),
-    #tdm_stream{stream_pid = Pid} = dict:fetch(?DEFAULT_STREAM_ID, State#state.streams),
-    case From =:= Pid of
-        true -> {stop, {default_stream_death, Reason}, State};
+handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->  %% todo
+%%     error_logger:error_msg("Child killed ~p: ~p, state=~p", [Pid, Reason, State]),
+    #tdm_stream{stream_pid = DefPid} = dict:fetch(?DEFAULT_STREAM_ID, State#state.streams),
+    case Pid of
+        DefPid -> {stop, {default_stream_death, Reason}, State};
         _ -> {noreply, State}
     end;
 
