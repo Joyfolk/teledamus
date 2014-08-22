@@ -1,4 +1,4 @@
--module(tdm_cql_types).
+-module(tdm_cql3_types).
 
 -include_lib("teledamus.hrl").
 

@@ -246,38 +246,38 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
 
                 options ->
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_OPTIONS, stream = StreamId}, length = 0, body = <<>>},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {query, Query, Params} ->
-                    Body = tdm_native_parser:encode_query(Query, Params),
+                    Body = tdm_cql3:encode_query(Query, Params),
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_QUERY, stream = StreamId}, length = byte_size(Body), body = Body},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {prepare, Query} ->
-                    Body = tdm_native_parser:encode_long_string(Query),
+                    Body = tdm_cql3:encode_long_string(Query),
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_PREPARE, stream = StreamId}, length = byte_size(Body), body = Body},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {execute, ID, Params} ->
-                    Body = tdm_native_parser:encode_query(ID, Params),
+                    Body = tdm_cql3:encode_query(ID, Params),
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_EXECUTE, stream = StreamId}, length = byte_size(Body), body = Body},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {batch, BatchQuery} ->
-                    Body = tdm_native_parser:encode_batch_query(BatchQuery),
+                    Body = tdm_cql3:encode_batch_query(BatchQuery),
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_BATCH, stream = StreamId}, length = byte_size(Body), body = Body},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 {register, EventTypes} ->
                     start_gen_event_if_required(),
-                    Body = tdm_native_parser:encode_event_types(EventTypes),
+                    Body = tdm_cql3:encode_event_types(EventTypes),
                     Frame = #tdm_frame{header = #tdm_header{type = request, opcode = ?OPC_REGISTER, stream = StreamId}, length = byte_size(Body), body = Body},
-                    tdm_connection:send_frame(Connection, tdm_native_parser:encode_frame(Frame, Compression)),
+                    tdm_connection:send_frame(Connection, tdm_cql3:encode_frame(Frame, Compression)),
                     {noreply, State#state{caller = From}};
 
                 _ ->
@@ -290,7 +290,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
             OpCode = (Frame#tdm_frame.header)#tdm_header.opcode,
             case OpCode of
                 ?OPC_ERROR ->
-                    Error = tdm_native_parser:parse_error(Frame),
+                    Error = tdm_cql3:parse_error(Frame),
                     error_logger:error_msg("CQL error ~p~n", [Error]),
                     reply_if_needed(Caller, {error, Error}, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
@@ -301,15 +301,15 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
                     throw({not_supported_option, authentificate}),
                     {noreply, State};
                 ?OPC_SUPPORTED ->
-                    {Options, _} = tdm_native_parser:parse_string_multimap(Frame#tdm_frame.body),
+                    {Options, _} = tdm_cql3:parse_string_multimap(Frame#tdm_frame.body),
                     reply_if_needed(Caller, Options, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_RESULT ->
-                    Result = tdm_native_parser:parse_result(Frame),
+                    Result = tdm_cql3:parse_result(Frame),
                     reply_if_needed(Caller, Result, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_EVENT ->
-                    Result = tdm_native_parser:parse_event(Frame),
+                    Result = tdm_cql3:parse_event(Frame),
                     gen_event:notify(cassandra_events, Result),
                     {noreply, State};
                 _ ->

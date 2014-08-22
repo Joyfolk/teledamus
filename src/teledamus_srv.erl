@@ -8,7 +8,7 @@
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
 -type cnode() :: [{nonempty_string(), pos_integer()}].
--record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: teledamus:transport(), compression = none :: teledamus:compression(), channel_monitor :: atom()}).
+-record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: teledamus:transport(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol = tdm_cql3 :: tdm_cql3}).
 
 %%%===================================================================
 %%% API
@@ -97,7 +97,7 @@ init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
     {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State) ->
-    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor} = State,
+    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor, protocol = Protocol} = State,
     case Request of
         get_connection -> % todo: connection pooling
             case tdm_rr:next(Nodes) of
@@ -109,7 +109,7 @@ handle_call(Request, From, State) ->
                             case Transport:connect(Host, Port, Opts) of
                                 {ok, Socket} ->
 %% 									process_flag(trap_exit, true),
-                                    {ok, Pid} = tdm_connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor),
+                                    {ok, Pid} = tdm_connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor, Protocol),
                                     DefStream = tdm_connection:get_default_stream(#tdm_connection{pid = Pid}),
                                     Connection = #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
                                     ok = Transport:controlling_process(Socket, Pid),

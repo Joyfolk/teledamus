@@ -1,4 +1,4 @@
--module(tdm_native_parser).
+-module(tdm_cql3).
 
 -include_lib("teledamus.hrl").
 
@@ -18,13 +18,10 @@ parse_frame_header(<<Type:1, Version:7/big-unsigned-integer, Flags:1/binary, Str
     #tdm_header{type = parse_type(Type), version = Version, flags = parse_flags(Flags), stream = Stream, opcode = OpCode}.
 
 
-encode_frame_header(#tdm_header{type = Type, version = Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
-    case Version of
-        3 ->
-            F = encode_flags(Flags),
-            T = encode_type(Type),
-            <<T:1, Version:7/big-unsigned-integer, F:1/binary, Stream:16/big-signed-integer, OpCode:8/big-unsigned-integer>>
-    end.
+encode_frame_header(#tdm_header{type = Type, version = 3, flags = Flags, stream = Stream, opcode = OpCode}) ->
+    F = encode_flags(Flags),
+    T = encode_type(Type),
+    <<T:1, 3:7/big-unsigned-integer, F:1/binary, Stream:16/big-signed-integer, OpCode:8/big-unsigned-integer>>.
 
 parse_type(0) -> request;
 parse_type(1) -> response.
@@ -539,9 +536,9 @@ parse_row(Data, Acc, ColSpecs) ->
         [H | T] ->
             {V, X0} = case H of
                 [] -> %% no metadata, use blob
-                    tdm_cql_types:decode(blob, Data);
+                    tdm_cql3_types:decode(blob, Data);
                 {_K, _T, _N, Type} ->
-                    tdm_cql_types:decode(Type, Data);
+                    tdm_cql3_types:decode(Type, Data);
                 U ->
                     error_logger:error_msg("Uparseable colspec ~p~n", [U])
             end,
@@ -700,10 +697,10 @@ encode_single_query({Query, Binds}) when is_list(Query), is_list(Binds) -> %% qu
 
 encode_bind_value({Name, Value}) when is_list(Name) ->
     S = encode_string(Name),
-    V = tdm_cql_types:encode_t(Value),
+    V = tdm_cql3_types:encode_t(Value),
     <<S/binary, V/binary>>;
 encode_bind_value(X) ->
-    tdm_cql_types:encode_t(X).
+    tdm_cql3_types:encode_t(X).
 
 
 -spec encode_values(BindValues :: teledamus:bind_variables()) -> binary().

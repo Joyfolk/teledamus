@@ -6,7 +6,7 @@
 
 
 %% API
--export([start/6, start/7, prepare_ets/0]).
+-export([start/8, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
     new_stream/2, release_stream/2, release_stream_async/1, send_frame/2, get_default_stream/1]).
 
@@ -20,7 +20,7 @@
 
 
 -record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
-    streams :: dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference()}).
+    streams :: dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference(), protocol = tdm_cql3 :: tdm_cql3}).
 
 
 %%%===================================================================
@@ -148,11 +148,8 @@ close(#tdm_connection{pid = Pid}, Timeout) ->
 %% @spec start() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start(Socket, Credentials, Transport, Compression, Host, Port) ->
-    gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port, undefined], []).
-
-start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor) ->
-    gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor], []).
+start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor, Protocol) ->
+    gen_server:start(?MODULE, [Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor, Protocol], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -169,9 +166,9 @@ start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor) -
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor]) ->
+init([Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor, Protocol]) ->
     try
-       case startup(Socket, Credentials, Transport, Compression) of
+       case startup(Socket, Credentials, Transport, Compression, Protocol) of
         ok ->
             set_active(Socket, Transport),
             Connection = #tdm_connection{pid = self(), host = Host, port = Port},
@@ -284,8 +281,8 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport, buffer = Buffer, compression = Compression} = State) ->
-    case tdm_native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
+handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport, buffer = Buffer, compression = Compression, protocol = Protocol} = State) ->
+    case Protocol:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
         {undefined, NewBuffer} ->
 %%       set_active(Socket, Transport),
             {noreply, State#state{buffer = NewBuffer}};
@@ -293,8 +290,8 @@ handle_info({tcp, Socket, Data}, #state{socket = Socket, transport = _Transport,
             handle_frame(Frame, State#state{buffer = NewBuffer})
     end;
 
-handle_info({ssl, Socket, Data}, #state{socket = Socket, buffer = Buffer, compression = Compression} = State) ->
-    case tdm_native_parser:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
+handle_info({ssl, Socket, Data}, #state{socket = Socket, buffer = Buffer, compression = Compression, protocol = Protocol} = State) ->
+    case Protocol:parse_frame(<<Buffer/binary, Data/binary>>, Compression) of
         {undefined, NewBuffer} ->
             {noreply, State#state{buffer = NewBuffer}};
         {Frame, NewBuffer} ->
@@ -371,8 +368,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-send(Socket, Transport, Compression, Frame) ->
-    F = tdm_native_parser:encode_frame(Frame, Compression),
+send(Socket, Transport, Compression, Frame, Protocol) ->
+    F = Protocol:encode_frame(Frame, Compression),
     Transport:send(Socket, F).
 
 
@@ -409,18 +406,18 @@ startup_opts(Compression) ->
     end.
 
 
-startup(Socket, Credentials, Transport, Compression) ->
-    case send(Socket, Transport, Compression, #tdm_frame{header = #tdm_header{opcode = ?OPC_STARTUP, type = request}, body = tdm_native_parser:encode_string_map(startup_opts(Compression))}) of
+startup(Socket, Credentials, Transport, Compression, Protocol) ->
+    case send(Socket, Transport, Compression, #tdm_frame{header = #tdm_header{opcode = ?OPC_STARTUP, type = request}, body = Protocol:encode_string_map(startup_opts(Compression))}, Protocol) of
         ok ->
-            {Frame, _R} = read_frame(Socket, Transport, Compression),
+            {Frame, _R} = read_frame(Socket, Transport, Compression, Protocol),
             case (Frame#tdm_frame.header)#tdm_header.opcode of
                 ?OPC_ERROR ->
-                    Error = tdm_native_parser:parse_error(Frame),
+                    Error = Protocol:parse_error(Frame),
                     error_logger:error_msg("CQL error ~p~n", [Error]),
                     {error, Error};
                 ?OPC_AUTHENTICATE ->
-                    {Authenticator, _Rest} = tdm_native_parser:parse_string(Frame#tdm_frame.body),
-                    authenticate(Socket, Authenticator, Credentials, Transport, Compression);
+                    {Authenticator, _Rest} = Protocol:parse_string(Frame#tdm_frame.body),
+                    authenticate(Socket, Authenticator, Credentials, Transport, Compression, Protocol);
                 ?OPC_READY ->
                     ok;
                 OpCode ->
@@ -430,7 +427,7 @@ startup(Socket, Credentials, Transport, Compression) ->
             {error, Error}
     end.
 
-read_frame(Socket, Transport, Compression) ->
+read_frame(Socket, Transport, Compression, Protocol) ->
     {ok, Data} = Transport:recv(Socket, 9),
     <<_Header:5/binary, Length:32/big-unsigned-integer>> = Data,
     {ok, Body} = if
@@ -438,26 +435,26 @@ read_frame(Socket, Transport, Compression) ->
         true -> {ok, <<>>}
     end,
     F = <<Data/binary,Body/binary>>,
-    tdm_native_parser:parse_frame(F, Compression).
+    Protocol:parse_frame(F, Compression).
 
 
-encode_plain_credentials(User, Password) when is_list(User) ->
-    encode_plain_credentials(list_to_binary(User), Password);
-encode_plain_credentials(User, Password) when is_list(Password) ->
-    encode_plain_credentials(User, list_to_binary(Password));
-encode_plain_credentials(User, Password) when is_binary(User), is_binary(Password)->
-    tdm_native_parser:encode_bytes(<<0,User/binary,0,Password/binary>>).
+encode_plain_credentials(User, Password, Protocol) when is_list(User) ->
+    encode_plain_credentials(list_to_binary(User), Password, Protocol);
+encode_plain_credentials(User, Password, Protocol) when is_list(Password) ->
+    encode_plain_credentials(User, list_to_binary(Password), Protocol);
+encode_plain_credentials(User, Password, Protocol) when is_binary(User), is_binary(Password)->
+    Protocol:encode_bytes(<<0,User/binary,0,Password/binary>>).
 
 
-authenticate(Socket, Authenticator, Credentials, Transport, Compression) ->
+authenticate(Socket, Authenticator, Credentials, Transport, Compression, Protocol) ->
     %% todo: pluggable authentification
     {User, Password} = Credentials,
-    case send(Socket, Transport, Compression, #tdm_frame{header = #tdm_header{opcode = ?OPC_AUTH_RESPONSE, type = request}, body = encode_plain_credentials(User, Password)}) of
+    case send(Socket, Transport, Compression, #tdm_frame{header = #tdm_header{opcode = ?OPC_AUTH_RESPONSE, type = request}, body = encode_plain_credentials(User, Password, Protocol)}, Protocol) of
         ok ->
-            {Frame, _R} = read_frame(Socket, Transport, Compression),
+            {Frame, _R} = read_frame(Socket, Transport, Compression, Protocol),
             case (Frame#tdm_frame.header)#tdm_header.opcode of
                 ?OPC_ERROR ->
-                    Error = tdm_native_parser:parse_error(Frame),
+                    Error = Protocol:parse_error(Frame),
                     error_logger:error_msg("Authentication error [~p]: ~p~n", [Authenticator, Error]),
                     {error, Error};
                 ?OPC_AUTH_CHALLENGE ->
