@@ -435,7 +435,7 @@ list_datatype_read_test_() ->
     {setup, fun start/0, fun stop/1, fun(Connection) ->
         teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
-        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
+        teledamus:query(Connection, "CREATE TABLE test (
                                   a int PRIMARY KEY,
                                   b list<int>
                                  )", #tdm_query_params{}, 3000),
@@ -452,7 +452,7 @@ list_datatype_null_read_test_() ->
     {setup, fun start/0, fun stop/1, fun(Connection) ->
         teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
-        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
+        teledamus:query(Connection, "CREATE TABLE test (
                                   a int PRIMARY KEY,
                                   b list<int>
                                  )", #tdm_query_params{}, 3000),
@@ -485,7 +485,7 @@ list_datatype_null_test_() ->
     {setup, fun start/0, fun stop/1, fun(Connection) ->
         teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
         teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
-        {schema_change, created, table, "test", "test"} = teledamus:query(Connection, "CREATE TABLE test (
+        teledamus:query(Connection, "CREATE TABLE test (
                                   a int PRIMARY KEY,
                                   b list<int>
                                  )", #tdm_query_params{}, 3000),
