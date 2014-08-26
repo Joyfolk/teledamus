@@ -8,7 +8,7 @@
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
 -type cnode() :: [{nonempty_string(), pos_integer()}].
--record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: teledamus:transport(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol = tdm_cql3 :: tdm_cql3 | tdm_cql2 | tdm_cql1}).
+-record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: teledamus:transport(), compression = none :: teledamus:compression(), channel_monitor :: atom()}).
 
 %%%===================================================================
 %%% API
@@ -97,7 +97,7 @@ init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
     {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State) ->
-    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor, protocol = Protocol} = State,
+    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor} = State,
     case Request of
         get_connection -> % todo: connection pooling
             case tdm_rr:next(Nodes) of
@@ -105,23 +105,8 @@ handle_call(Request, From, State) ->
                     throw(error_no_resources);
                 {{Host, Port}, NS} ->
                     spawn(fun() ->
-                        try
-                            case Transport:connect(Host, Port, Opts) of
-                                {ok, Socket} ->
-%% 									process_flag(trap_exit, true),
-                                    {ok, Pid} = tdm_connection:start(Socket, Credentials, Transport, Compression, Host, Port, ChannelMonitor, Protocol),
-                                    DefStream = tdm_connection:get_default_stream(#tdm_connection{pid = Pid}),
-                                    Connection = #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
-                                    ok = Transport:controlling_process(Socket, Pid),
-                                    gen_server:reply(From, Connection);
-                                {error, Reason} ->
-                                    gen_server:reply(From, {error, Reason})
-                            end
-                        catch
-                            E:EE ->
-                                error_logger:error_msg("Connection error: ~p:~p, trace=~p", [E, EE, erlang:get_stacktrace()]),
-                                gen_server:reply(From, {error, {E, EE, erlang:get_stacktrace()}})
-                        end
+                        Reply = connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor),
+                        gen_server:reply(From, Reply)
                     end),
                     {noreply, State#state{nodes = NS}}
             end;
@@ -135,6 +120,25 @@ handle_call(Request, From, State) ->
                 false ->
                     {reply, {error, connection_is_not_alive}, State}
             end
+    end.
+
+connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor) ->
+    case connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, cql1) of
+        {ok, Connection} ->
+%%             error_logger:info_msg("Connected [~p]", tdm_connection:get_protocol_version(Connection)),
+            Connection;
+        Err = {error, _Reason} ->
+            Err
+    end.
+
+connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, MinProtocol) ->
+    case tdm_connection:start(Host, Port, Opts, Credentials, Transport, Compression, ChannelMonitor, MinProtocol) of
+        {ok, Pid}  ->
+            DefStream = tdm_connection:get_default_stream(#tdm_connection{pid = Pid}),
+            Connection = #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
+            {ok, Connection};
+        Err ->
+            Err
     end.
 
 %%--------------------------------------------------------------------
@@ -190,8 +194,7 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
--spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
+-spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
     ok.
 
@@ -202,8 +205,7 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
-    Extra :: term()) ->
+-spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{}, Extra :: term()) ->
     {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

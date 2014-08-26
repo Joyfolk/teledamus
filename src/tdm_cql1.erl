@@ -12,15 +12,26 @@
 -export([parse_error/1, parse_result/1, parse_metadata/1]).
 -export([encode_query_params/1,encode_batch_query/1,parse_event/1,encode_query/2]).
 -export([encode_event_types/1]).
+-export([cql_version/0, startup_header/0, header_length/0]).
+
+
+cql_version() ->
+    <<"3.0.0">>.
+
+startup_header() ->
+    #tdm_header{opcode = ?OPC_STARTUP, type = request, version = 1}.
+
+header_length() ->
+    4.
 
 parse_frame_header(<<Type:1, Version:7/big-unsigned-integer, Flags:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>) ->
     #tdm_header{type = parse_type(Type), version = Version, flags = parse_flags(Flags), stream = Stream, opcode = OpCode}.
 
 
-encode_frame_header(#tdm_header{type = Type, version = Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
+encode_frame_header(#tdm_header{type = Type, version = _Version, flags = Flags, stream = Stream, opcode = OpCode}) ->
     F = encode_flags(Flags),
     T = encode_type(Type),
-    <<T:1, Version:7/big-unsigned-integer, F:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>.
+    <<T:1, 1:7/big-unsigned-integer, F:1/binary, Stream:8/big-signed-integer, OpCode:8/big-unsigned-integer>>.
 
 parse_type(0) -> request;
 parse_type(1) -> response.
@@ -101,7 +112,7 @@ encode_frame(Frame, Compression) ->
         Length > ?MAX_BODY_LENGTH -> throw(body_size_too_long);
         true -> ok
     end,
-    H = encode_frame_header(Header),
+    H = encode_frame_header(Header#tdm_header{version = 1}),
     <<H/binary, Length:32/big-signed-integer, Body/binary>>.
 
 

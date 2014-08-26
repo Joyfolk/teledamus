@@ -78,9 +78,6 @@
 -define(CONSISTENCY_LOCAL_ONE, 10).
 
 
-%% CQL VERSION
--define(CQL_VERSION, <<"3.0.0">>).
-
 %% ERROR CODES
 -define(ERR_SERVER_ERROR,    16#0000).
 -define(ERR_PROTOCOL_ERROR,  16#000A).

@@ -17,7 +17,7 @@ parse_flags_test() ->
 parse_header_test() ->
     H = #tdm_header{type = request, version = 1, flags = #tdm_flags{compressing = true, tracing = false}, opcode = 12, stream = 37},
     ?assertEqual(<<0:1,1:7,1:8,37:8,12:8>>, tdm_cql1:encode_frame_header(H)),
-    ?assertEqual(<<1:1,3:7,1:8,37:8,12:8>>, tdm_cql1:encode_frame_header(H#tdm_header{type = response, version = 3})),
+    ?assertEqual(<<1:1,1:7,1:8,37:8,12:8>>, tdm_cql1:encode_frame_header(H#tdm_header{type = response, version = 3})),
     ?assertEqual(<<0:1,1:7,3:8,37:8,12:8>>, tdm_cql1:encode_frame_header(H#tdm_header{flags = #tdm_flags{tracing = true, compressing = true}})),
     ?assertEqual(<<0:1,1:7,1:8,-1:8/big-signed-integer,21:8>>, tdm_cql1:encode_frame_header(H#tdm_header{opcode = 21, stream = -1})),
     ?assertEqual(H, tdm_cql1:parse_frame_header(<<0:1,1:7,1:8,37:8,12:8>>)),

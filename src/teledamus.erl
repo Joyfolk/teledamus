@@ -30,8 +30,10 @@
 -type batch_query_item() :: {query_text() | prepared_query_id(), bind_variables()}.
 -type batch_query() :: #tdm_batch_query{}.
 -type cql_result() :: timeout | ok | error() | result_rows() | schema_change().
+-type protocol_version() :: cql1 | cql2 | cql3.
+-type protocol_module() :: tdm_cql1 | tdm_cql2 | tdm_cql3.
 
--export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, cql_type/0, cql_tagged_value/0, cql_plain_type/0, cql_result/0]).
+-export_type([consistency_level/0, query_params/0, batch_type/0, batch_query/0, batch_query_item/0, bind_variables/0, cql_type/0, cql_tagged_value/0, cql_plain_type/0, cql_result/0, protocol_version/0, protocol_module/0]).
 
 %% api specific
 -type async_target() :: undefined | atom() | pid() | fun((any()) -> any()) | {atom(), atom(), list()}.

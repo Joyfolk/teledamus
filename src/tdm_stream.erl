@@ -3,27 +3,27 @@
 %% -behaviour(gen_server).
 
 %% API
--export([start/3, start/4, stop/2, stop/1]).
+-export([start/4, start/5, stop/2, stop/1]).
 
--export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/4, close/2]).
+-export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4, handle_frame/2, init/5, close/2]).
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3]).
 
 -include_lib("teledamus.hrl").
 
 
--record(state, {connection :: teledamus:connection(), id :: teledamus:stream_id(), caller :: term(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol = tdm_cql3 :: tdm_cql1 | tdm_cql2 | tdm_cql3}).
+-record(state, {connection :: teledamus:connection(), id :: teledamus:stream_id(), caller :: term(), compression = none :: teledamus:compression(), channel_monitor :: atom(), protocol :: teledamus:protocol_module()}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
--spec(start(teledamus:connection(), teledamus:stream_id(), teledamus:compression()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start(Connection, StreamId, Compression) ->
-    proc_lib:start(?MODULE, init, [Connection, StreamId, Compression, undefined]).
+-spec(start(teledamus:connection(), teledamus:stream_id(), teledamus:compression(), teledamus:protocol_module()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start(Connection, StreamId, Compression, Protocol) ->
+    proc_lib:start(?MODULE, init, [Connection, StreamId, Compression, undefined, Protocol]).
 
--spec(start(teledamus:connection(), teledamus:stream_id(), teledamus:compression(), atom()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start(Connection, StreamId, Compression, ChannelMonitor) ->
-    proc_lib:start(?MODULE, init, [Connection, StreamId, Compression, ChannelMonitor]).
+-spec(start(teledamus:connection(), teledamus:stream_id(), teledamus:compression(), atom(), teledamus:protocol_module()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start(Connection, StreamId, Compression, ChannelMonitor, Protocol) ->
+    proc_lib:start(?MODULE, init, [Connection, StreamId, Compression, ChannelMonitor, Protocol]).
 
 -spec stop(Stream :: teledamus:stream()) ->  timeout | ok.
 stop(Stream) ->
@@ -182,10 +182,10 @@ close(Stream, Timeout) ->
     call(Stream, stop, Timeout).
 
 
-init(Connection, StreamId, Compression, ChannelMonitor) ->
+init(Connection, StreamId, Compression, ChannelMonitor, Protocol) ->
     proc_lib:init_ack({ok, self()}),
     erlang:monitor(process, Connection#tdm_connection.pid),
-    loop(#state{connection = Connection, id = StreamId, compression = Compression, channel_monitor = ChannelMonitor}).
+    loop(#state{connection = Connection, id = StreamId, compression = Compression, channel_monitor = ChannelMonitor, protocol = Protocol}).
 
 loop(State) ->
     receive
