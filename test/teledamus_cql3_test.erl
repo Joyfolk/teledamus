@@ -1,4 +1,4 @@
--module(teledamus_test).
+-module(teledamus_cql3_test).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("teledamus.hrl").
@@ -11,6 +11,7 @@ is_registered(_) ->
 
 
 start() ->
+    application:set_env(teledamus, required_protocol_version, cql3),
     ok = teledamus:start(),
     Con = teledamus:get_connection(),
     #tdm_connection{} = Con,
@@ -20,7 +21,8 @@ stop(Con) ->
     try
         ok = teledamus:release_connection(Con)
     after
-        teledamus:stop()
+        teledamus:stop(),
+        application:unset_env(teledamus, required_protocol_version)
     end.
 
 start_stop_test_() ->
@@ -741,7 +743,7 @@ simple_async_api_fun_test_() ->
 simple_async_api_mfa_test_() ->
     {"Simple async api test / pid"},
     {setup, fun start/0, fun stop/1, fun(Connection) ->
-        ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #tdm_query_params{}, {teledamus_test, async_mfa, []}),
+        ok = teledamus:query_async(Connection, "SELECT * from system.schema_keyspaces WHERE keyspace_name = 'system'", #tdm_query_params{}, {teledamus_cql3_test, async_mfa, []}),
         timer:sleep(1000),
         {ok, A} = application:get_env(test, async_mfa),
         {Meta, Paging, Rows} = A,
@@ -845,7 +847,7 @@ simple_query_mon_test_() ->
 
 
 start_mon() ->
-    application:set_env(teledamus, channel_monitor, teledamus_test),
+    application:set_env(teledamus, channel_monitor, teledamus_cql3_test),
     teledamus = ets:new(teledamus, [public, named_table]),
     ok = teledamus:start(),
     Con = teledamus:get_connection(),

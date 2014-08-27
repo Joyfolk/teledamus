@@ -8,7 +8,16 @@
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
 -type cnode() :: [{nonempty_string(), pos_integer()}].
--record(state, {nodes :: rr_state(cnode()), opts :: list(), credentials :: {string(), string()}, transport = gen_tcp :: teledamus:transport(), compression = none :: teledamus:compression(), channel_monitor :: atom()}).
+
+-record(state, {
+    nodes :: rr_state(cnode()),
+    opts :: list(),
+    credentials :: {string(), string()},
+    transport = gen_tcp :: teledamus:transport(),
+    compression = none :: teledamus:compression(),
+    channel_monitor :: atom(),
+    required_protocol_version = cql1 :: teledamus:protocol_version()
+}).
 
 %%%===================================================================
 %%% API
@@ -37,6 +46,7 @@ release_connection(Connection, Timeout) ->
 start_link(Args) ->
     Credentials = {proplists:get_value(username, Args), proplists:get_value(password, Args)},
     ChannelMonitor = proplists:get_value(channel_monitor, Args, undefined),
+    RequiredProtocolVersion = proplists:get_value(required_protocol_version, Args, cql1),
     Nodes = proplists:get_value(cassandra_nodes, Args),
     Transport = case proplists:get_value(transport, Args, tcp) of
         tcp -> gen_tcp;
@@ -49,7 +59,7 @@ start_link(Args) ->
     Compression = proplists:get_value(compression, Args, none),
     tdm_stmt_cache:init(),
     tdm_connection:prepare_ets(),
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [#tdm_rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [#tdm_rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion], []).
 
 prepare_transport(gen_tcp, Args) ->
     proplists:get_value(tcp_opts, Args, []);
@@ -69,17 +79,22 @@ prepare_transport(ssl, Args) ->
 %% @doc
 %% Initializes the server
 %%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
+%% @spec init(Args) -> {ok, State} | {ok, State, Timeout} | ignore | {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
 -spec(init(Args :: term()) ->
     {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term()} | ignore).
-init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
-    {ok, #state{nodes = tdm_rr:reinit(RR), opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor}}.
+init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion]) ->
+    {ok, #state{
+        nodes = tdm_rr:reinit(RR),
+        opts = Opts,
+        credentials = Credentials,
+        transport = Transport,
+        compression = Compression,
+        channel_monitor = ChannelMonitor,
+        required_protocol_version = RequiredProtocolVersion
+    }}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -88,16 +103,12 @@ init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #state{}) ->
-    {reply, Reply :: term(), NewState :: #state{}} |
-    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()}, State :: #state{}) ->
+    {reply, Reply :: term(), NewState :: #state{}} | {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
+    {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} | {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State) ->
-    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor} = State,
+    #state{nodes = Nodes, opts = Opts, credentials = Credentials, transport = Transport, compression = Compression, channel_monitor = ChannelMonitor, required_protocol_version = MinProtocol} = State,
     case Request of
         get_connection -> % todo: connection pooling
             case tdm_rr:next(Nodes) of
@@ -105,7 +116,7 @@ handle_call(Request, From, State) ->
                     throw(error_no_resources);
                 {{Host, Port}, NS} ->
                     spawn(fun() ->
-                        Reply = connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor),
+                        Reply = connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, MinProtocol),
                         gen_server:reply(From, Reply)
                     end),
                     {noreply, State#state{nodes = NS}}
@@ -122,21 +133,12 @@ handle_call(Request, From, State) ->
             end
     end.
 
-connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor) ->
-    case connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, cql1) of
-        {ok, Connection} ->
-%%             error_logger:info_msg("Connected [~p]", tdm_connection:get_protocol_version(Connection)),
-            Connection;
-        Err = {error, _Reason} ->
-            Err
-    end.
 
 connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, MinProtocol) ->
     case tdm_connection:start(Host, Port, Opts, Credentials, Transport, Compression, ChannelMonitor, MinProtocol) of
         {ok, Pid}  ->
             DefStream = tdm_connection:get_default_stream(#tdm_connection{pid = Pid}),
-            Connection = #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream},
-            {ok, Connection};
+            #tdm_connection{pid = Pid, host = Host, port = Port, default_stream = DefStream};
         Err ->
             Err
     end.
@@ -149,8 +151,7 @@ connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, M
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_cast(Request :: term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_cast(Request, State) ->
     #state{nodes = Nodes} = State,
@@ -171,14 +172,11 @@ handle_cast(Request, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
+%% @spec handle_info(Info, State) -> {noreply, State} | {noreply, State, Timeout} | {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
+    {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -205,8 +203,7 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{}, Extra :: term()) ->
-    {ok, NewState :: #state{}} | {error, Reason :: term()}).
+-spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{}, Extra :: term()) -> {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
