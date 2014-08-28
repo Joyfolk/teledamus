@@ -346,6 +346,7 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
                     {error, Info}
             after
                 Timeout ->
+                    erlang:demonitor(Mref, [flush]),
                     {error, timeout}
             end
     catch
