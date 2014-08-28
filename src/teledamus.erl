@@ -181,7 +181,7 @@ release_stream(Stream, Timeout) ->
 %%%
 %%% Connection or Stream - connection to DB, as returned from get_connection() or stream
 %%% @end
--spec options(connection() | stream()) -> timeout | error() | options().
+-spec options(connection() | stream()) -> {error, timeout} | error() | options().
 options(Stream = #tdm_stream{}) ->
     tdm_stream:options(Stream, ?DEFAULT_TIMEOUT);
 options(Connection) ->
@@ -205,7 +205,7 @@ options_async(Connection, ReplyTo) ->
 %%% Connection or Stream - connection to DB, as returned from get_connection() or stream
 %%% Timeout - the number of milliseconds before operation times out.
 %%% @end
--spec options(connection() | stream(), timeout()) -> timeout | error() | options().
+-spec options(connection() | stream(), timeout()) -> {error, timeout} | error() | options().
 options(Stream = #tdm_stream{}, Timeout) ->
     tdm_stream:options(Stream, Timeout);
 options(Connection, Timeout) ->
@@ -219,7 +219,7 @@ options(Connection, Timeout) ->
 %%% Query - string with CQL query
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection() | stream(), string()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(connection() | stream(), string()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 query(Stream = #tdm_stream{}, Query) ->
     tdm_stream:query(Stream, Query, #tdm_query_params{}, ?DEFAULT_TIMEOUT);
 query(Connection, Query) ->
@@ -255,7 +255,7 @@ query_async(Connection, Query, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection() | stream(), string(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(connection() | stream(), string(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 query(Stream = #tdm_stream{}, Query, Timeout) ->
     tdm_stream:query(Stream, Query, #tdm_query_params{}, Timeout);
 query(Connection, Query, Timeout) ->
@@ -271,7 +271,7 @@ query(Connection, Query, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection()| stream(), string(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(connection()| stream(), string(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 query(Stream = #tdm_stream{}, Query, Params, Timeout) ->
     tdm_stream:query(Stream, Query, Params, Timeout);
 query(Connection, Query, Params, Timeout) ->
@@ -334,7 +334,7 @@ query_async(Connection, Query, ReplyTo, Params, UseCache) ->
 %%% Query - string with CQL query
 %%% Result - {prepared_query_id() :: binary()} or error or timeout
 %%% @end
--spec prepare_query(connection() | stream(), string()) -> timeout | error() | {binary(), metadata(), metadata()}.
+-spec prepare_query(connection() | stream(), string()) -> {error, timeout} | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #tdm_stream{}, Query) ->
     tdm_stream:prepare_query(Stream, Query, ?DEFAULT_TIMEOUT);
 prepare_query(Connection, Query) ->
@@ -362,7 +362,7 @@ prepare_query_async(Connection, Query, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - {prepared_query_id() :: binary()} or error or timeout
 %%% @end
--spec prepare_query(connection() | stream, string(), timeout()) -> timeout | error() | {binary(), metadata(), metadata()}.
+-spec prepare_query(connection() | stream, string(), timeout()) -> {error, timeout} | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #tdm_stream{}, Query, Timeout) ->
     tdm_stream:prepare_query(Stream, Query, Timeout);
 prepare_query(Connection, Query, Timeout) ->
@@ -377,7 +377,7 @@ prepare_query(Connection, Query, Timeout) ->
 %%% UseCache - use cached preparestatements
 %%% Result - {prepared_query_id() :: binary()} or error or timeout
 %%% @end
--spec prepare_query(connection() | stream, string(), timeout(), boolean()) -> timeout | error() | {binary(), metadata(), metadata()}.
+-spec prepare_query(connection() | stream, string(), timeout(), boolean()) -> {error, timeout} | error() | {binary(), metadata(), metadata()}.
 prepare_query(Stream = #tdm_stream{}, Query, Timeout, UseCache) ->
     tdm_stream:prepare_query(Stream, Query, Timeout, UseCache);
 prepare_query(Connection, Query, Timeout, UseCache) ->
@@ -406,7 +406,7 @@ prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #tdm_stream{}, ID) ->
     tdm_stream:execute_query(Stream, ID, #tdm_query_params{}, ?DEFAULT_TIMEOUT);
 execute_query(Connection, ID) ->
@@ -434,7 +434,7 @@ execute_query_async(Connection, ID, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #tdm_stream{}, ID, Timeout) ->
     tdm_stream:execute_query(Stream, ID, #tdm_query_params{}, Timeout);
 execute_query(Connection, ID, Timeout) ->
@@ -449,7 +449,7 @@ execute_query(Connection, ID, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary(), query_params(), timeout()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
 execute_query(Stream = #tdm_stream{}, ID, Params, Timeout) ->
     tdm_stream:execute_query(Stream, ID, Params, Timeout);
 execute_query(Connection, ID, Params, Timeout) ->
@@ -477,7 +477,7 @@ execute_query_async(Connection, ID, Params, ReplyTo) ->
 %%% Batch - batch query record. Contains list of queries in the batch. It can be prepared statements or simple DML cql queries (INSERT/UPDATE/DELETE, no SELECTs)
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), batch_query()) -> timeout | ok | error().
+-spec batch_query(connection() | stream(), batch_query()) -> {error, timeout} | ok | error().
 batch_query(Stream = #tdm_stream{}, Batch) ->
     tdm_stream:batch_query(Stream, Batch, ?DEFAULT_TIMEOUT);
 batch_query(Connection, Batch) ->
@@ -505,7 +505,7 @@ batch_query_async(Connection, Batch, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), batch_query(), timeout()) -> timeout | ok.
+-spec batch_query(connection() | stream(), batch_query(), timeout()) -> {error, timeout} | result_rows() | ok.
 batch_query(Stream = #tdm_stream{}, Batch, Timeout) ->
     tdm_stream:batch_query(Stream, Batch, Timeout);
 batch_query(Connection, Batch, Timeout) ->
@@ -521,7 +521,7 @@ batch_query(Connection, Batch, Timeout) ->
 %%% UseCache - use cached preparestatements
 %%% Result - result of query or error or timeout.
 %%% @end
--spec batch_query(connection() | stream(), batch_query(), timeout(), boolean()) -> timeout | ok | error().
+-spec batch_query(connection() | stream(), batch_query(), timeout(), boolean()) -> {error, timeout} | ok | error().
 batch_query(Stream = #tdm_stream{}, Batch, Timeout, UseCache) ->
     tdm_stream:batch_query(Stream, Batch, Timeout, UseCache);
 batch_query(Connection, Batch, Timeout, UseCache) ->
@@ -551,7 +551,7 @@ batch_query_async(Connection, Batch, ReplyTo, UseCache) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - ok | timeout | error
 %%% @end
--spec subscribe_events(connection(), list(string() | atom()), timeout()) -> ok | timeout | error().
+-spec subscribe_events(connection(), list(string() | atom()), timeout()) -> ok | {error, timeout} | error().
 subscribe_events(Connection, EventTypes, Timeout) ->
     tdm_connection:subscribe_events(Connection, EventTypes, Timeout).
 
@@ -563,7 +563,7 @@ subscribe_events(Connection, EventTypes, Timeout) ->
 %%% EventType - types of events to subscribe (schema_change, topology_change or status_change)
 %%% Result - ok | timeout | error
 %%% @end
--spec subscribe_events(connection(), list(string() | atom())) -> ok | timeout | error().
+-spec subscribe_events(connection(), list(string() | atom())) -> ok | {error, timeout} | error().
 subscribe_events(Connection, EventTypes) ->
     tdm_connection:subscribe_events(Connection, EventTypes, ?DEFAULT_TIMEOUT).
 

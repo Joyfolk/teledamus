@@ -25,15 +25,15 @@ start(Connection, StreamId, Compression, Protocol) ->
 start(Connection, StreamId, Compression, ChannelMonitor, Protocol) ->
     proc_lib:start(?MODULE, init, [Connection, StreamId, Compression, ChannelMonitor, Protocol]).
 
--spec stop(Stream :: teledamus:stream()) ->  timeout | ok.
+-spec stop(Stream :: teledamus:stream()) ->  {error, timeout} | ok.
 stop(Stream) ->
     stop(Stream, infinity).
 
--spec stop(Stream :: teledamus:stream(), Timeout :: timeout()) ->  timeout | ok.
+-spec stop(Stream :: teledamus:stream(), Timeout :: timeout()) ->  {error, timeout} | ok.
 stop(Stream, Timeout) ->
     call(Stream, stop, Timeout).
 
--spec options(Stream :: teledamus:stream(), Timeout :: timeout()) ->  timeout | teledamus:error() | teledamus:options().
+-spec options(Stream :: teledamus:stream(), Timeout :: timeout()) ->  {error, timeout} | teledamus:error() | teledamus:options().
 options(Stream, Timeout) ->
     call(Stream, options, Timeout).
 
@@ -41,7 +41,7 @@ options(Stream, Timeout) ->
 options_async(Stream, ReplyTo) ->
     cast(Stream, options, ReplyTo).
 
--spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(Stream, Query, Params, Timeout) ->
     call(Stream, {query, Query, Params}, Timeout).
 
@@ -49,7 +49,7 @@ query(Stream, Query, Params, Timeout) ->
 query_async(Stream, Query, Params, ReplyTo) ->
     cast(Stream, {query, Query, Params}, ReplyTo).
 
--spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(Stream = #tdm_stream{connection = Con}, Query, Params, Timeout, UseCache) ->
     case UseCache of
         true ->
@@ -76,7 +76,7 @@ query_async(Stream = #tdm_stream{connection = Con}, Query, Params, ReplyTo, UseC
     end.
 
 
--spec prepare_query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Timeout :: timeout()) -> timeout | teledamus:error() | {teledamus:prepared_query_id(), teledamus:metadata(), teledamus:metadata()}.
+-spec prepare_query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Timeout :: timeout()) -> {error, timeout} | teledamus:error() | {teledamus:prepared_query_id(), teledamus:metadata(), teledamus:metadata()}.
 prepare_query(Stream, Query, Timeout) ->
     prepare_query(Stream, Query, Timeout, false).
 
@@ -84,7 +84,7 @@ prepare_query(Stream, Query, Timeout) ->
 prepare_query_async(Stream, Query, Timeout) ->
     prepare_query_async(Stream, Query, Timeout, false).
 
--spec prepare_query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | teledamus:error() | {teledamus:prepared_query_id(), teledamus:metadata(), teledamus:metadata()}.
+-spec prepare_query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | teledamus:error() | {teledamus:prepared_query_id(), teledamus:metadata(), teledamus:metadata()}.
 prepare_query(Stream, Query, Timeout, UseCache) ->
     R = call(Stream, {prepare, Query}, Timeout),
     case {UseCache, R} of
@@ -107,7 +107,7 @@ prepare_query_async(Stream, Query, ReplyTo, UseCache) ->
         end
     end).
 
--spec execute_query(Stream :: teledamus:stream(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec execute_query(Stream :: teledamus:stream(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 execute_query(Stream, ID, Params, Timeout) ->
     call(Stream, {execute, ID, Params}, Timeout).
 
@@ -116,7 +116,7 @@ execute_query_async(Stream, ID, Params, ReplyTo) ->
     cast(Stream, {execute, ID, Params}, ReplyTo).
 
 
--spec batch_query(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), Timeout :: timeout()) -> timeout | ok | teledamus:error().
+-spec batch_query(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), Timeout :: timeout()) -> {error, timeout} | teledamus:result_rows() | ok | teledamus:error().
 batch_query(Stream, Batch, Timeout) ->
     call(Stream, {batch, Batch}, Timeout).
 
@@ -124,7 +124,7 @@ batch_query(Stream, Batch, Timeout) ->
 batch_query_async(Stream, Batch, ReplyTo) ->
     cast(Stream, {batch, Batch}, ReplyTo).
 
--spec batch_query(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error().
+-spec batch_query(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error().
 batch_query(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_query{queries = Queries}, Timeout, UseCache) ->
     case UseCache of
         true ->
@@ -145,7 +145,7 @@ batch_query(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_query{que
             call(Stream, {batch, Batch}, Timeout)
     end.
 
--spec batch_query_async(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), ReplyTo :: teledamus:async_target(), UseCache :: boolean()) -> timeout | ok.
+-spec batch_query_async(Stream :: teledamus:stream(), Batch :: teledamus:batch_query(), ReplyTo :: teledamus:async_target(), UseCache :: boolean()) -> {error, timeout} | ok.
 batch_query_async(Stream, Batch, ReplyTo, false) ->
     batch_query_async(Stream, Batch, ReplyTo);
 batch_query_async(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_query{queries = Queries}, ReplyTo, true) ->
@@ -160,7 +160,7 @@ batch_query_async(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_que
         cast(Stream, {batch, Batch#tdm_batch_query{queries = Qs}}, ReplyTo)
     end).
 
--spec subscribe_events(Stream :: teledamus:stream(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | teledamus:error().
+-spec subscribe_events(Stream :: teledamus:stream(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | {error, timeout} | teledamus:error().
 subscribe_events(Stream, EventTypes, Timeout) ->
     call(Stream, {register, EventTypes}, Timeout).
 
