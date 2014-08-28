@@ -390,14 +390,17 @@ set_active(Socket, Transport) ->
 
 handle_frame(Frame = #tdm_frame{header = Header}, State = #state{streams = Streams}) ->
 %%   set_active(State#state.socket, Transport),
-    StreamId = Header#tdm_header.stream,
+    StreamId = case Header#tdm_header.stream >= 0 of
+                   true -> Header#tdm_header.stream;
+                   false -> ?DEFAULT_STREAM_ID          %% negative stream id is server initiated streams
+               end,
     case dict:is_key(StreamId, Streams) of
         true ->
             Stream = dict:fetch(StreamId, Streams),
             tdm_stream:handle_frame(Stream#tdm_stream.stream_pid, Frame);
         false ->
-            Stream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
-            tdm_stream:handle_frame(Stream#tdm_stream.stream_pid, Frame)
+            error_logger:info_msg("Unhandled frame to stream ~p", [StreamId]),
+            ignore
     end,
     {noreply, State}.
 
