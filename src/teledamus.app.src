@@ -17,6 +17,8 @@
             {compression, none} %% none or 3-tuple with compression name, 2-tuple compression module & function, threshold size (bytes)
 %% 		{compression, {"lz4", {lz4, pack, unpack}, 1024}} %% none or 3-tuple with compression name, 2-tuple compression module & function, threshold size (bytes)
 %%    {compression, {"snappy", {snappy, compress, decompress}, 1024}} %% none or 3-tuple with compression name, 2-tuple compression module & function, threshold size (bytes)
+
+%%             {nodes_autodiscovery_perions_ms, 60000} %% experimental
         ]
         }
     ]

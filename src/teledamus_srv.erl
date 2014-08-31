@@ -7,7 +7,7 @@
 
 -export([start_link/1, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, get_connection/0, get_connection/1, release_connection/1, release_connection/2]).
 
--type cnode() :: [{nonempty_string(), pos_integer()}].
+-type cnode() :: [{nonempty_string() | teledamus:inet(), pos_integer()}].
 
 -record(state, {
     nodes :: rr_state(cnode()),
@@ -16,7 +16,8 @@
     transport = gen_tcp :: teledamus:transport(),
     compression = none :: teledamus:compression(),
     channel_monitor :: atom(),
-    required_protocol_version = cql1 :: teledamus:protocol_version()
+    required_protocol_version = cql1 :: teledamus:protocol_version(),
+    timer :: timer:tref() | undefined
 }).
 
 %%%===================================================================
@@ -44,6 +45,7 @@ release_connection(Connection, Timeout) ->
 %%--------------------------------------------------------------------
 -spec(start_link(list()) -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link(Args) ->
+    NodesAutodiscoveryPeriod = proplists:get_value(nodes_autodiscovery_perions_ms, Args),
     Credentials = {proplists:get_value(username, Args), proplists:get_value(password, Args)},
     ChannelMonitor = proplists:get_value(channel_monitor, Args, undefined),
     RequiredProtocolVersion = proplists:get_value(required_protocol_version, Args, cql1),
@@ -59,7 +61,7 @@ start_link(Args) ->
     Compression = proplists:get_value(compression, Args, none),
     tdm_stmt_cache:init(),
     tdm_connection:prepare_ets(),
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [#tdm_rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [#tdm_rr_state{init = Init}, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion, NodesAutodiscoveryPeriod], []).
 
 prepare_transport(gen_tcp, Args) ->
     proplists:get_value(tcp_opts, Args, []);
@@ -85,7 +87,14 @@ prepare_transport(ssl, Args) ->
 -spec(init(Args :: term()) ->
     {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term()} | ignore).
-init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion]) ->
+init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredProtocolVersion, NodesAutodiscoveryPeriod]) ->
+    {ok, Tm} = case NodesAutodiscoveryPeriod of
+        undefined ->
+            {ok, undefined};
+        _ ->
+            self() ! update_cluster_info,
+            timer:send_interval(NodesAutodiscoveryPeriod, self(), update_cluster_info)
+    end,
     {ok, #state{
         nodes = tdm_rr:reinit(RR),
         opts = Opts,
@@ -93,7 +102,8 @@ init([RR, Opts, Credentials, Transport, Compression, ChannelMonitor, RequiredPro
         transport = Transport,
         compression = Compression,
         channel_monitor = ChannelMonitor,
-        required_protocol_version = RequiredProtocolVersion
+        required_protocol_version = RequiredProtocolVersion,
+        timer = Tm
     }}.
 
 %%--------------------------------------------------------------------
@@ -155,7 +165,6 @@ connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, M
     {stop, Reason :: term(), NewState :: #state{}}).
 handle_cast(Request, State) ->
     #state{nodes = Nodes} = State,
-    %% todo: add public api and/or automatic cluster changes discovery
     case Request of
         {add_node, Host, Port} ->
             {noreply, State#state{nodes = tdm_rr:add(Nodes, {Host, Port})}};
@@ -163,6 +172,8 @@ handle_cast(Request, State) ->
             {noreply, State#state{nodes = tdm_rr:remove(Nodes, {Host, Port})}};
         reload_nodes ->
             {noreply, State#state{nodes = tdm_rr:reinit(Nodes)}};
+        {set_nodes, NewNodes} ->
+            {noreply, State#state{nodes = Nodes#tdm_rr_state{resources = NewNodes}}};
         _ ->
             {noreply, State}
     end.
@@ -178,6 +189,12 @@ handle_cast(Request, State) ->
 -spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
     {noreply, NewState :: #state{}} | {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
+handle_info(update_cluster_info, State) ->
+    spawn(fun() ->
+        Nodes = get_cluster(),
+        gen_server:cast(?MODULE, {set_nodes, Nodes})
+    end),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -193,8 +210,11 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()), State :: #state{}) -> term()).
-terminate(_Reason, _State) ->
-    ok.
+terminate(_Reason, #state{timer = Tm}) ->
+    case Tm of
+        undefined -> ok;
+        _ -> timer:cancel(Tm)
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -207,3 +227,23 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+-spec get_cluster() -> [cnode()].
+get_cluster() ->
+    try
+        Con = get_connection(),
+        try
+            {_, _,  Peers} = teledamus:query(Con, "SELECT rpc_address FROM system.peers"),
+            AllPeers = case teledamus:query(Con, "SELECT schema_version FROM system.local WHERE key='local'") of
+                {_, _, []} -> Peers;
+                {_, _, [_]} -> Peers ++ ["localhost"]
+            end,
+            AllPeers2 = lists:filter(fun(X) -> X =/= {0, 0, 0, 0} end, AllPeers),  %% do something for ipv6?
+            error_logger:info_msg("Found ~p nodes in cluster", [length(AllPeers2)]),
+            lists:map(fun(X) -> {X, 9042} end, AllPeers2)
+        after
+            release_connection(Con)
+        end
+    catch
+        E: EE ->
+            error_logger:error_msg("Failed to load cluster info: ~p:~p, stack=~p", [E, EE, erlang:get_stacktrace()])
+    end.
