@@ -46,7 +46,7 @@ release_stream_async(S = #tdm_stream{connection = #tdm_connection{pid = Pid}}) -
     tdm_stream:stop(S),
     gen_server:cast(Pid, {release_stream, S}).
 
--spec options(Connection :: teledamus:connection(), Timeout :: timeout()) ->  timeout | teledamus:error() | teledamus:options().
+-spec options(Connection :: teledamus:connection(), Timeout :: timeout()) ->  {error, timeout} | teledamus:error() | teledamus:options().
 options(#tdm_connection{default_stream = Stream}, Timeout) ->
     tdm_stream:options(Stream, Timeout).
 
@@ -54,7 +54,7 @@ options(#tdm_connection{default_stream = Stream}, Timeout) ->
 options_async(#tdm_connection{default_stream = Stream}, Timeout) ->
     tdm_stream:options_async(Stream, Timeout).
 
--spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout) ->
     tdm_stream:query(Stream, Query, Params, Timeout).
 
@@ -62,7 +62,7 @@ query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout) ->
 query_async(#tdm_connection{default_stream = Stream}, Query, Params, ReplyTo) ->
     tdm_stream:query_async(Stream, Query, Params, ReplyTo).
 
--spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
     tdm_stream:query(Stream, Query, Params, Timeout, UseCache).
 
@@ -78,7 +78,7 @@ prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout) ->
 prepare_query_async(#tdm_connection{default_stream = Stream}, Query, ReplyTo) ->
     tdm_stream:prepare_query_async(Stream, Query, ReplyTo).
 
--spec prepare_query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | teledamus:error() | {binary(), teledamus:metadata(), teledamus:metadata()}.
+-spec prepare_query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | teledamus:error() | {binary(), teledamus:metadata(), teledamus:metadata()}.
 prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout, UseCache) ->
     tdm_stream:prepare_query(Stream, Query, Timeout, UseCache).
 
@@ -86,7 +86,7 @@ prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout, UseCache
 prepare_query_async(#tdm_connection{default_stream = Stream}, Query, ReplyTo, UseCache) ->
     tdm_stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
 
--spec execute_query(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> timeout | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec execute_query(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
 execute_query(#tdm_connection{default_stream = Stream}, ID, Params, Timeout) ->
     tdm_stream:execute_query(Stream, ID, Params, Timeout).
 
@@ -94,7 +94,7 @@ execute_query(#tdm_connection{default_stream = Stream}, ID, Params, Timeout) ->
 execute_query_async(#tdm_connection{default_stream = Stream}, ID, Params, ReplyTo) ->
     tdm_stream:execute_query_async(Stream, ID, Params, ReplyTo).
 
--spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout()) -> timeout | ok | teledamus:error().
+-spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout()) -> {error, timeout} | teledamus:result_rows() | ok | teledamus:error().
 batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout) ->
     tdm_stream:batch_query(Stream, Batch, Timeout).
 
@@ -102,7 +102,7 @@ batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout) ->
 batch_query_async(#tdm_connection{default_stream = Stream}, Batch, ReplyTo) ->
     tdm_stream:batch_query_async(Stream, Batch, ReplyTo).
 
--spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> timeout | ok | teledamus:error().
+-spec batch_query(Con :: teledamus:connection(), Batch :: teledamus:batch_query(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error().
 batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout, UseCache) ->
     tdm_stream:batch_query(Stream, Batch, Timeout, UseCache).
 
@@ -110,11 +110,11 @@ batch_query(#tdm_connection{default_stream = Stream}, Batch, Timeout, UseCache) 
 batch_query_async(#tdm_connection{default_stream = Stream}, Batch, ReplyTo, UseCache) ->
     tdm_stream:batch_query_async(Stream, Batch, ReplyTo, UseCache).
 
--spec subscribe_events(Con :: teledamus:connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | timeout | teledamus:error().
+-spec subscribe_events(Con :: teledamus:connection(), EventTypes :: list(string() | atom()), Timeout :: timeout()) -> ok | {error, timeout} | teledamus:error().
 subscribe_events(#tdm_connection{default_stream = Stream}, EventTypes, Timeout) ->
     tdm_stream:subscribe_events(Stream, EventTypes, Timeout).
 
--spec subscribe_events_async(Con :: teledamus:connection(), EventTypes :: [string() | atom()], ReplyTo :: teledamus:async_target()) -> ok | timeout | {error, Reason :: term()}.
+-spec subscribe_events_async(Con :: teledamus:connection(), EventTypes :: [string() | atom()], ReplyTo :: teledamus:async_target()) -> ok | {error, timeout} | {error, Reason :: term()}.
 subscribe_events_async(#tdm_connection{default_stream = Stream}, EventTypes, ReplyTo) ->
     tdm_stream:subscribe_events_async(Stream, EventTypes, ReplyTo).
 
@@ -390,14 +390,17 @@ set_active(Socket, Transport) ->
 
 handle_frame(Frame = #tdm_frame{header = Header}, State = #state{streams = Streams}) ->
 %%   set_active(State#state.socket, Transport),
-    StreamId = Header#tdm_header.stream,
+    StreamId = case Header#tdm_header.stream >= 0 of
+                   true -> Header#tdm_header.stream;
+                   false -> ?DEFAULT_STREAM_ID          %% negative stream id is server initiated streams
+               end,
     case dict:is_key(StreamId, Streams) of
         true ->
             Stream = dict:fetch(StreamId, Streams),
             tdm_stream:handle_frame(Stream#tdm_stream.stream_pid, Frame);
         false ->
-            Stream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
-            tdm_stream:handle_frame(Stream#tdm_stream.stream_pid, Frame)
+            error_logger:info_msg("Unhandled frame to stream ~p", [StreamId]),
+            ignore
     end,
     {noreply, State}.
 
