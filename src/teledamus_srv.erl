@@ -126,8 +126,14 @@ handle_call(Request, From, State) ->
                     throw(error_no_resources);
                 {{Host, Port}, NS} ->
                     spawn(fun() ->
-                        Reply = connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, MinProtocol),
-                        gen_server:reply(From, Reply)
+                        try
+                          Reply = connect(Transport, Host, Port, Opts, Credentials, Compression, ChannelMonitor, MinProtocol),
+                          gen_server:reply(From, Reply)
+                        catch
+                            E: EE ->
+                                error_logger:error_msg("Error creating connection: ~p:~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()]),
+                                gen_server:reply(From, {error, {E, EE}})
+                        end
                     end),
                     {noreply, State#state{nodes = NS}}
             end;
