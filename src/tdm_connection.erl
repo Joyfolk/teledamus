@@ -5,6 +5,8 @@
 -include_lib("teledamus.hrl").
 
 
+-define(CONNECTION_TIMEOUT, 3000).
+
 %% API
 -export([start/8, prepare_ets/0]).
 -export([options/2, query/4, prepare_query/3, execute_query/4, batch_query/3, subscribe_events/3, get_socket/1, from_cache/2, to_cache/3, query/5, prepare_query/4, batch_query/4,
@@ -448,7 +450,7 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, [Protocol | P
     end.
 
 startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
-    try Transport:connect(Host, Port, Opts) of
+    try Transport:connect(Host, Port, Opts, ?CONNECTION_TIMEOUT) of
         {ok, Socket} ->
             try
                 CasOpts = startup_opts(Compression, Protocol),
@@ -480,11 +482,11 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
                     {error, {E1, EE1, erlang:get_stacktrace()}}
             end;
         Err = {error, Reason} ->
-            error_logger:error_msg("Connection error: ~p", [Reason]),
+            error_logger:error_msg("~p:~p : Connection error: ~p", [Host, Port, Reason]),
             Err
     catch
         E: EE ->
-            error_logger:error_msg("Connection error: ~p:~p, trace=~p", [E, EE, erlang:get_stacktrace()]),
+            error_logger:error_msg("~p:~p : Connection error: ~p:~p, trace=~p", [Host, Port, E, EE, erlang:get_stacktrace()]),
             {error, {E, EE, erlang:get_stacktrace()}}
     end.
 
