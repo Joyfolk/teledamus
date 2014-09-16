@@ -124,7 +124,7 @@ subscribe_events_async(#tdm_connection{default_stream = Stream}, EventTypes, Rep
 get_socket(#tdm_connection{pid = Pid})->
     gen_server:call(Pid, get_socket).
 
--spec get_socket(Pid :: pid()) -> teledamus:connection() | {error, Reason :: term()}.
+-spec get_connection(Pid :: pid()) -> teledamus:connection() | {error, Reason :: term()}.
 get_connection(Pid) ->
     gen_server:call(Pid, get_connection).
 
