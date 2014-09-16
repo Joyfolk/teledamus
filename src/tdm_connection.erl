@@ -13,7 +13,7 @@
     new_stream/2, release_stream/2, release_stream_async/1, send_frame/2, get_default_stream/1]).
 
 -export([options_async/2, query_async/4, query_async/5, prepare_query_async/3, prepare_query_async/4, execute_query_async/4, batch_query_async/3, batch_query_async/4, subscribe_events_async/3,
-    close/2, get_protocol_version/1]).
+    close/2, get_protocol_version/1, get_connection/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -123,6 +123,10 @@ subscribe_events_async(#tdm_connection{default_stream = Stream}, EventTypes, Rep
 -spec get_socket(Con :: teledamus:connection()) -> teledamus:socket() | {error, Reason :: term()}.
 get_socket(#tdm_connection{pid = Pid})->
     gen_server:call(Pid, get_socket).
+
+-spec get_socket(Pid :: pid()) -> teledamus:connection() | {error, Reason :: term()}.
+get_connection(Pid) ->
+    gen_server:call(Pid, get_connection).
 
 -spec get_protocol_version(Con :: teledamus:connection()) -> teledamus:protocol_version().
 get_protocol_version(#tdm_connection{pid = Pid}) ->
@@ -235,6 +239,9 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = Transpor
 
         get_socket ->
             {reply, State#state.socket, Socket};
+
+        get_connection ->
+            {reply, #tdm_connection{default_stream = dict:fetch(?DEFAULT_STREAM_ID, Streams), host = Host, port = Port, pid = self()}, State};
 
         get_protocol_version ->
             {reply, module_to_protocol(Protocol), State};
