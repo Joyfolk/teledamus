@@ -238,7 +238,7 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = Transpor
             {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
 
         get_socket ->
-            {reply, State#state.socket, Socket};
+            {reply, State#state.socket, State};
 
         get_connection ->
             {reply, #tdm_connection{default_stream = dict:fetch(?DEFAULT_STREAM_ID, Streams), host = Host, port = Port, pid = self()}, State};
