@@ -480,7 +480,6 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, [Protocol | P
     end.
 
 startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
-    error_logger:info_msg("trying protocol ~p~n", [Protocol]),
     try Transport:connect(Host, Port, Opts, ?CONNECTION_TIMEOUT) of
         {ok, Socket} ->
             try
