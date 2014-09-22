@@ -463,7 +463,7 @@ module_to_protocol(tdm_cql3) -> cql3.
 
 
 startup(Host, Port, Opts, Credentials, Transport, Compression, MinProtocol) ->
-    Protocols = lists:filter(fun(Protocol) -> Protocol >= protocol_to_module(MinProtocol) end, [tdm_cql3, tdm_cql2, tdm_cql1]),
+    Protocols = lists:filter(fun(Protocol) -> Protocol =:= protocol_to_module(MinProtocol) end, [tdm_cql3, tdm_cql2, tdm_cql1]),
     startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocols, MinProtocol).
 
 startup_int(_Host, _Port, _Opts, _Credentials, _Transport, _Compression, [], MinProtocol) ->
@@ -480,6 +480,7 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, [Protocol | P
     end.
 
 startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
+    error_logger:info_msg("trying protocol ~p~n", [Protocol]),
     try Transport:connect(Host, Port, Opts, ?CONNECTION_TIMEOUT) of
         {ok, Socket} ->
             try

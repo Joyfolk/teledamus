@@ -16,7 +16,7 @@
     transport = gen_tcp :: teledamus:transport(),
     compression = none :: teledamus:compression(),
     channel_monitor :: atom(),
-    required_protocol_version = cql1 :: teledamus:protocol_version(),
+    required_protocol_version = undefined :: teledamus:protocol_version() | undefined,
     timer :: timer:tref() | undefined
 }).
 
@@ -48,7 +48,7 @@ start_link(Args) ->
     NodesAutodiscoveryPeriod = proplists:get_value(nodes_autodiscovery_perions_ms, Args),
     Credentials = {proplists:get_value(username, Args), proplists:get_value(password, Args)},
     ChannelMonitor = proplists:get_value(channel_monitor, Args, undefined),
-    RequiredProtocolVersion = proplists:get_value(required_protocol_version, Args, cql1),
+    RequiredProtocolVersion = proplists:get_value(required_protocol_version, Args),
     Nodes = proplists:get_value(cassandra_nodes, Args),
     Transport = case proplists:get_value(transport, Args, tcp) of
         tcp -> gen_tcp;
