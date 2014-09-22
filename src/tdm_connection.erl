@@ -257,10 +257,7 @@ handle_call(Request, _From, State = #state{socket = Socket, transport = Transpor
             {reply, module_to_protocol(Protocol), State};
 
         {stop, Timeout} ->
-            demonitor(MonitorRef, [flush]),
-            DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
-            tdm_stream:close(DefStream, Timeout),
-            Transport:close(Socket),
+            stop_int(MonitorRef, Streams, Timeout, Socket, Transport),
             {stop, normal, ok, State};
 
         _ ->
@@ -371,10 +368,10 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(Reason, #state{socket = Socket, transport = Transport, host = Host, port = Port}) ->
+terminate(Reason, #state{socket = Socket, transport = Transport, host = Host, port = Port, monitor_ref = MonitorRef, streams = Streams}) ->
     try
-        ets:delete(?DEF_STREAM_ETS, self()),
-        Transport:close(Socket)
+        stop_int(MonitorRef, Streams, 5000, Socket, Transport),
+        ets:delete(?DEF_STREAM_ETS, self())
     after
         case Reason of
             normal ->
@@ -585,3 +582,10 @@ find_next_stream_id(Id, Streams) ->
 
 get_default_stream(#tdm_connection{pid = Pid}) ->
     #tdm_stream{} = gen_server:call(Pid, {get_stream, ?DEFAULT_STREAM_ID}).
+
+
+stop_int(MonitorRef, Streams, Timeout, Socket, Transport) ->
+    demonitor(MonitorRef, [flush]),
+    DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
+    catch tdm_stream:close(DefStream, Timeout),
+    catch Transport:close(Socket).
