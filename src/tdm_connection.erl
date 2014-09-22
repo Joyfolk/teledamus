@@ -361,9 +361,18 @@ handle_info(Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, #state{socket = Socket, transport = Transport}) ->
-    ets:delete(?DEF_STREAM_ETS, self()),
-    Transport:close(Socket).
+terminate(Reason, #state{socket = Socket, transport = Transport, host = Host, port = Port}) ->
+    try
+        ets:delete(?DEF_STREAM_ETS, self()),
+        Transport:close(Socket)
+    after
+        case Reason of
+            normal -> ok;
+            shutdown -> ok;
+            {shutdown, _Reason} -> ok;
+            _ -> tdm_stmt_cache:invalidate(Host, Port) %% invalidate cache in case of cassandra server shutdown
+        end
+    end.
 
 %%--------------------------------------------------------------------
 %% @private

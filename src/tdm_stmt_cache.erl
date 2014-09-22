@@ -6,7 +6,7 @@
 -include_lib("teledamus.hrl").
 
 %% API
--export([init/0, to_cache/2, from_cache/1, cache/3, cache_async/3, cache_async_multple/3]).
+-export([init/0, to_cache/2, from_cache/1, cache/3, cache_async/3, cache_async_multple/3, invalidate/2]).
 
 -define(STMT_CACHE, teledamus_stmt_cache).
 
@@ -110,3 +110,9 @@ cache_async_multple([Q | T], Con, ReplyTo, Dict) ->
                 end
             end)
     end.
+
+
+-spec invalidate(Host :: string(), Port :: pos_integer()) -> ok.
+invalidate(Host, Port) ->
+    true = ets:match_delete(?STMT_CACHE, {{Host, Port, '_'}, '_'}).
+
