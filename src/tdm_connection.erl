@@ -188,7 +188,17 @@ init([Host, Port, Opts, Credentials, Transport, Compression, ChannelMonitor, Min
                 DefStream = #tdm_stream{connection = Connection, stream_id = ?DEFAULT_STREAM_ID, stream_pid = StreamId},
                 DefStream2 = DefStream#tdm_stream{connection = Connection#tdm_connection{default_stream = DefStream}},
                 ets:insert(?DEF_STREAM_ETS, {self(), DefStream2}),
-                {ok, #state{socket = Socket, transport = Transport, compression = Compression, streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()), monitor_ref = MonitorRef, protocol = protocol_to_module(Protocol)}};
+                {ok, #state{
+                    socket = Socket,
+                    transport = Transport,
+                    compression =
+                    Compression,
+                    streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()),
+                    monitor_ref = MonitorRef,
+                    protocol = protocol_to_module(Protocol),
+                    host = Host,
+                    port = Port
+                }};
             {error, Reason} ->
                 error_logger:error_msg("Failed to start with ~p", [Reason]),
                 {stop, Reason}
@@ -316,19 +326,19 @@ handle_info({ssl, Socket, Data}, #state{socket = Socket, buffer = Buffer, compre
     end;
 
 handle_info({tcp_closed, _Socket}, State) ->
-    error_logger:error_msg("TCP connection closed~n"),
+    error_logger:error_msg("~p: TCP connection closed~n", [self()]),
     {stop, tcp_closed, State};
 
 handle_info({ssl_closed, _Socket}, State) ->
-    error_logger:error_msg("SSL connection closed~n"),
+    error_logger:error_msg("~p: SSL connection closed~n", [self()]),
     {stop, ssl_closed, State};
 
 handle_info({tcp_error, _Socket, Reason}, State) ->
-    error_logger:error_msg("TCP error [~p]~n", [Reason]),
+    error_logger:error_msg("~p: TCP error [~p]~n", [self(), Reason]),
     {stop, {tcp_error, Reason}, State};
 
 handle_info({ssl_error, _Socket, Reason}, State) ->
-    error_logger:error_msg("SSL error [~p]~n", [Reason]),
+    error_logger:error_msg("~p: SSL error [~p]~n", [self(), Reason]),
     {stop, {tcp_error, Reason}, State};
 
 handle_info({inet_reply, _Socket, ok}, State) ->
@@ -367,10 +377,14 @@ terminate(Reason, #state{socket = Socket, transport = Transport, host = Host, po
         Transport:close(Socket)
     after
         case Reason of
-            normal -> ok;
-            shutdown -> ok;
-            {shutdown, _Reason} -> ok;
-            _ -> tdm_stmt_cache:invalidate(Host, Port) %% invalidate cache in case of cassandra server shutdown
+            normal ->
+                ok;
+            shutdown ->
+                ok;
+            {shutdown, _Reason} ->
+                ok;
+            _ ->
+                tdm_stmt_cache:invalidate(Host, Port) %% invalidate cache in case of cassandra server shutdown
         end
     end.
 

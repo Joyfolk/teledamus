@@ -204,6 +204,8 @@ loop(State) ->
             catch
                 exit: normal ->
                     exit(normal);
+                exit: EE ->
+                    exit(EE);
                 E: EE ->
                     error_logger:error_msg("~p:~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()]),
                     exit({E, EE})
