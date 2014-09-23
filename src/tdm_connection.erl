@@ -346,7 +346,6 @@ handle_info({inet_reply, _, Status}, State) ->
     {noreply, State};
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->  %% todo
-%%     error_logger:error_msg("Child killed ~p: ~p, state=~p", [Pid, Reason, State]),
     #tdm_stream{stream_pid = DefPid} = dict:fetch(?DEFAULT_STREAM_ID, State#state.streams),
     case Pid of
         DefPid -> {stop, {default_stream_death, Reason}, State};
@@ -585,6 +584,7 @@ get_default_stream(#tdm_connection{pid = Pid}) ->
 
 
 stop_int(MonitorRef, Streams, Timeout, Socket, Transport) ->
+    error_logger:info_msg("Stopping connection~n"),
     demonitor(MonitorRef, [flush]),
     DefStream = dict:fetch(?DEFAULT_STREAM_ID, Streams),
     catch tdm_stream:close(DefStream, Timeout),

@@ -189,6 +189,8 @@ init(Connection, StreamId, Compression, ChannelMonitor, Protocol) ->
 
 loop(State) ->
     receive
+        {'DOWN', _MonitorRef, _Type, _Object, killed} ->
+            exit(normal);
         {'DOWN', _MonitorRef, _Type, _Object, Info} ->
             error_logger:error_msg("Connection down ~p: ~p", [State#state.connection, Info]),
             exit(connection_down);
