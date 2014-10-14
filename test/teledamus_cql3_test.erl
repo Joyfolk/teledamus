@@ -175,6 +175,43 @@ text_datatypes_null_test_() ->
         [?_assertEqual([["abc", undefined, undefined]], Rows)]
     end}.
 
+
+paging_test_() ->
+    {"Paging test"},
+    {setup, fun start/0, fun stop/1, fun(Connection) ->
+        teledamus:query(Connection, "CREATE KEYSPACE IF NOT EXISTS test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1}", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "USE test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "CREATE TABLE test (
+                                  a ascii PRIMARY KEY
+                                 )", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc1"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc2"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc3"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc4"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc5"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc6"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc7"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc8"}]}, 3000),
+        teledamus:query(Connection, "INSERT INTO test(a) values(?)", #tdm_query_params{bind_values = [{ascii, "abc9"}]}, 3000),
+        {_, P0, Rows0} = teledamus:query(Connection, "SELECT a FROM test", #tdm_query_params{page_size = 3}, 3000),
+        {_, P1, Rows1} = teledamus:query(Connection, "SELECT a FROM test", #tdm_query_params{page_size = 3, paging_state = P0}, 3000),
+        {_, P2, Rows2} = teledamus:query(Connection, "SELECT a FROM test", #tdm_query_params{page_size = 3, paging_state = P1}, 3000),
+        {_, P3, Rows3} = teledamus:query(Connection, "SELECT a FROM test", #tdm_query_params{page_size = 3, paging_state = P2}, 3000),
+        teledamus:query(Connection, "DROP TABLE test", #tdm_query_params{}, 3000),
+        teledamus:query(Connection, "DROP KEYSPACE test", #tdm_query_params{}, 3000),
+        [
+            ?_assertNotEqual(undefined, P0),
+            ?_assertNotEqual(undefined, P1),
+            ?_assertNotEqual(undefined, P2),
+            ?_assertEqual(undefined, P3),
+            ?_assertEqual(3, length(Rows0)),
+            ?_assertEqual(3, length(Rows1)),
+            ?_assertEqual(3, length(Rows2)),
+            ?_assertEqual(0, length(Rows3)),
+            ?_assertEqual([["abc1"], ["abc2"], ["abc3"], ["abc4"], ["abc5"], ["abc6"], ["abc7"], ["abc8"], ["abc9"]], lists:sort(Rows0 ++ Rows1 ++ Rows2))
+        ]
+    end}.
+
 bigint_datatype_test_() ->
     {"bigint datatype test"},
     {setup, fun start/0, fun stop/1, fun(Connection) ->
