@@ -714,6 +714,7 @@ encode_bind_value(X) ->
 
 
 -spec encode_values(BindValues :: teledamus:bind_variables()) -> binary().
+encode_values([]) -> <<>>;
 encode_values(BindValues) ->
     N = encode_short(length(BindValues)),
     V = list_to_binary(lists:map(fun encode_bind_value/1, BindValues)),

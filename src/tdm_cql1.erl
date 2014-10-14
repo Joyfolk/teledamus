@@ -632,9 +632,9 @@ encode_batch_query(_Query) ->
     throw({unsupported_protocol_feature, cql1}).
 
 
+encode_values([]) -> <<>>;
 encode_values(BindValues) ->
     N = encode_short(length(BindValues)),
-
     V = list_to_binary(lists:map(fun(X) ->
         tdm_cql1_types:encode_t(X)
     end,  BindValues)),

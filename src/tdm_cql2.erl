@@ -642,9 +642,9 @@ encode_single_query({Query, Binds}) when is_list(Query), is_list(Binds) -> %% qu
     B = encode_values(Binds),
     <<0:8/big-signed-integer,Q/binary,B/binary>>.
 
+encode_values([]) -> <<>>;
 encode_values(BindValues) ->
     N = encode_short(length(BindValues)),
-
     V = list_to_binary(lists:map(fun(X) ->
         tdm_cql2_types:encode_t(X)
     end,  BindValues)),
