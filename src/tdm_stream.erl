@@ -226,8 +226,8 @@ reply_if_needed(Caller, Reply, ChannelMonitor) ->
     case Caller of
         undefined ->
             ok;
-        {Pid, _} when is_pid(Pid) -> %% call reply
-            erlang:send(Pid, {reply, Caller, Reply}, [noconnect]);
+        {Pid, Mref} when is_pid(Pid) -> %% call reply
+            erlang:send(Pid, {Mref, Reply}, [noconnect]);
         Pid when is_pid(Pid) -> %% cast reply
             erlang:send(Pid, Reply, [noconnect]);
         Fun when is_function(Fun, 1) ->  %% cast reply
@@ -339,14 +339,14 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
             Tag = {self(), Mref},
             erlang:send(Pid, {call, Tag, Msg}, [noconnect]),
             receive
-                {reply, Tag, X} ->
+                {Mref, X} ->
                     erlang:demonitor(Mref, [flush]),
                     X;
-                stop ->
+%%                 stop ->
+%%                     ok;
+                {'DOWN', Mref, _Type, _Object, normal} ->
                     ok;
-                {'DOWN', _MonitorRef, _Type, _Object, normal} ->
-                    ok;
-                {'DOWN', _MonitorRef, _Type, _Object, Info} ->
+                {'DOWN', Mref, _Type, _Object, Info} ->
                     {error, Info}
             after
                 Timeout ->
