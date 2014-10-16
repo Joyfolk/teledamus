@@ -195,14 +195,8 @@ loop(State) ->
             error_logger:error_msg("Connection down ~p: ~p", [State#state.connection, Info]),
             exit(connection_down);
         Msg ->
-            try
-                case handle_msg(Msg, State) of
-                    {noreply, NewState} ->
-                        erlang:yield(),
-                        loop(NewState);
-                    {stop, _NewState} ->
-                        exit(normal)
-                end
+            Res = try
+                handle_msg(Msg, State)
             catch
                 exit: normal ->
                     exit(normal);
@@ -211,6 +205,13 @@ loop(State) ->
                 E: EE ->
                     error_logger:error_msg("~p:~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()]),
                     exit({E, EE})
+            end,
+            case Res of
+                {noreply, NewState} ->
+                    erlang:yield(),
+                    loop(NewState);
+                {stop, _NewState} ->
+                    exit(normal)
             end
     end.
 
