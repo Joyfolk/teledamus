@@ -164,7 +164,7 @@ batch_query_async(Stream = #tdm_stream{connection = Con}, Batch = #tdm_batch_que
 subscribe_events(Stream, EventTypes, Timeout) ->
     call(Stream, {register, EventTypes}, Timeout).
 
--spec subscribe_events_async(Stream ::teledamus:stream(), EventTypes :: list(string() | atom()), ReplyTo :: teledamus:async_target()) -> ok | {error, Reason :: term()}.
+-spec subscribe_events_async(Stream :: teledamus:stream(), EventTypes :: list(string() | atom()), ReplyTo :: teledamus:async_target()) -> ok | {error, Reason :: term()}.
 subscribe_events_async(Stream, EventTypes, ReplyTo) ->
     cast(Stream, {register, EventTypes}, ReplyTo).
 

@@ -1,5 +1,5 @@
 .eunit
-deps
+examples/bak/deps
 *.o
 *.beam
 *.plt
