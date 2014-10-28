@@ -5,7 +5,7 @@
 -include_lib("teledamus.hrl").
 
 
--define(CONNECTION_TIMEOUT, 3000).
+-define(CONNECTION_TIMEOUT, 2000).
 
 %% API
 -export([start/8, prepare_ets/0]).
