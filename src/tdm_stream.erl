@@ -343,8 +343,6 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
                 {Mref, X} ->
                     erlang:demonitor(Mref, [flush]),
                     X;
-%%                 stop ->
-%%                     ok;
                 {'DOWN', Mref, _Type, _Object, normal} ->
                     ok;
                 {'DOWN', Mref, _Type, _Object, Info} ->
@@ -352,6 +350,7 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
             after
                 Timeout ->
                     erlang:demonitor(Mref, [flush]),
+                    exit(Pid, timeout),
                     {error, timeout}
             end
     catch
