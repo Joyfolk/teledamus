@@ -6,6 +6,7 @@
 
 
 -define(CONNECTION_TIMEOUT, 2000).
+-define(RECV_TIMEOUT, 2000).
 
 %% API
 -export([start/8, prepare_ets/0]).
@@ -519,11 +520,11 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
 
 read_frame(Socket, Transport, Compression, Protocol) ->
     HeaderLen = Protocol:header_length(),
-    {ok, Data} = Transport:recv(Socket, HeaderLen + 4), %% header + frame length (32b)
+    {ok, Data} = Transport:recv(Socket, HeaderLen + 4, ?RECV_TIMEOUT), %% header + frame length (32b)
     <<_Header:HeaderLen/binary, Length:32/big-unsigned-integer>> = Data,
     Body = if
         Length =/= 0 ->
-            case Transport:recv(Socket, Length) of
+            case Transport:recv(Socket, Length, ?RECV_TIMEOUT) of
                 {ok, X} -> X;
                 {error, X} -> throw(X)
             end;
