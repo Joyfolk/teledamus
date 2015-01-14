@@ -297,6 +297,12 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
                 ?OPC_ERROR ->
                     Error = Protocol:parse_error(Frame),
                     error_logger:error_msg("CQL error ~p~n", [Error]),
+                    case Error of
+                        #tdm_error{type = unprepared_query} ->
+                            %% todo: check if invalid query id exists in cache + invalidate single query, not all?
+                            tdm_stmt_cache:invalidate(Connection#tdm_connection.host, Connection#tdm_connection.port);
+                        _ -> ok
+                    end,
                     reply_if_needed(Caller, {error, Error}, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_READY ->
