@@ -112,7 +112,7 @@ cache_async_multple([Q | T], Con, ReplyTo, Dict) ->
     end.
 
 
--spec invalidate(Host :: string(), Port :: pos_integer()) -> ok.
+-spec invalidate(Host :: string(), Port :: pos_integer()) -> true.
 invalidate(Host, Port) ->
     true = ets:match_delete(?STMT_CACHE, {{Host, Port, '_'}, '_'}).
 

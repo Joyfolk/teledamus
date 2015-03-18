@@ -238,7 +238,7 @@ reply_if_needed(Caller, Reply, ChannelMonitor) ->
     end.
 
 
-handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection{pid = Connection}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor, protocol = Protocol}) ->
+handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection{pid = Connection, host = Host, port = Port}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor, protocol = Protocol}) ->
     case Request of
         {call, From, Msg} ->
             case ChannelMonitor of
@@ -300,7 +300,7 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
                     case Error of
                         #tdm_error{type = unprepared_query} ->
                             %% todo: check if invalid query id exists in cache + invalidate single query, not all?
-                            tdm_stmt_cache:invalidate(Connection#tdm_connection.host, Connection#tdm_connection.port);
+                            tdm_stmt_cache:invalidate(Host, Port);
                         _ -> ok
                     end,
                     reply_if_needed(Caller, {error, Error}, ChannelMonitor),

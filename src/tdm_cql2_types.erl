@@ -30,7 +30,7 @@ erase_type({_Type, Value}) ->
 decode(Type, Value) ->
     decode(Type, Value, int).
 
--spec get_length(binary(), short | int) -> {non_neg_integer(), binary()}.
+-spec get_length(Data :: binary(), IntSize :: short | int) -> {non_neg_integer(), binary()}.
 get_length(Data, IntSize) ->
     S = case IntSize of
         short -> 16;

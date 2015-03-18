@@ -233,7 +233,9 @@ terminate(_Reason, #state{timer = Tm}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
--spec get_cluster() -> [cnode()].
+
+
+-spec get_cluster() -> [cnode()] | {error, Reason :: term()}.
 get_cluster() ->
     try
         Con = get_connection(),
@@ -251,5 +253,6 @@ get_cluster() ->
         end
     catch
         E: EE ->
-            error_logger:error_msg("Failed to load cluster info: ~p:~p, stack=~p", [E, EE, erlang:get_stacktrace()])
+            error_logger:error_msg("Failed to load cluster info: ~p:~p, stack=~p", [E, EE, erlang:get_stacktrace()]),
+            {error, {E, EE}}
     end.

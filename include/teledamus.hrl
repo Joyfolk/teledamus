@@ -133,9 +133,9 @@
 -record(tdm_query_params, {
     consistency_level = quorum :: teledamus:consistency_level(),
     skip_metadata = false :: boolean(),
-    page_size = undefined:: integer(),
+    page_size = undefined :: integer() | undefined,
     bind_values = [] :: teledamus:bind_variables() | undefined,
-    paging_state = undefined :: binary(),
+    paging_state = undefined :: binary() | undefined,
     serial_consistency = undefined :: teledamus:consistency_level() | undefined,
     timestamp = undefined :: non_neg_integer() | undefined,
     named_values = false :: boolean()

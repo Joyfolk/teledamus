@@ -30,12 +30,12 @@ erase_type({_Type, Value}) ->
 decode(Type, Value) ->
     decode(Type, Value, int).
 
--spec get_length(binary(), short | int) -> {non_neg_integer(), binary()}.
+-spec get_length(Data :: binary(), IntSize :: short | int) -> {non_neg_integer(), binary()}.
 get_length(Data, IntSize) ->
     S = case IntSize of
-        short -> 16;
-        int -> 32
-    end,
+            short -> 16;
+            int -> 32
+        end,
     <<Length:S/signed, Rest/binary>> = Data,
     {Length, Rest}.
 
@@ -236,7 +236,7 @@ decode_int(X) when is_binary(X) ->
     <<V:L/big-signed-integer>> = X,
     V.
 
--type int_type() :: 'short' | 'int' | 'long' | 'bigint'.
+-type int_type() :: short | int | long | bigint.
 -spec encode_int(integer(), int_type()) -> binary().
 %% encode_int(V, bytes) -> <<V:1/big-signed-integer-unit:8>>;
 encode_int(V, short) -> <<V:2/big-signed-integer-unit:8>>;
@@ -246,15 +246,6 @@ encode_int(V, bigint) ->
     L = int_size(V),
     <<V:L/big-signed-integer-unit:8>>.
 
-%% -spec decode_uint(binary()) -> binary().
-%% decode_uint(<<V:8/big-unsigned-integer>>) -> V;
-%% decode_uint(<<V:16/big-unsigned-integer>>) -> V;
-%% decode_uint(<<V:32/big-unsigned-integer>>) -> V;
-%% decode_uint(<<V:64/big-unsigned-integer>>) -> V;
-%% decode_uint(X) when is_binary(X) ->
-%%     L = byte_size(X) * 8,
-%%     <<V:L/big-unsigned-integer>> = X,
-%%     V.
 
 -spec encode_uint(non_neg_integer(), int_type()) -> binary().
 %% encode_uint(V, byte) -> <<V:8/big-unsigned-integer>>;
