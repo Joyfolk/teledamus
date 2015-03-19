@@ -219,7 +219,7 @@ options(Connection, Timeout) ->
 %%% Query - string with CQL query
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection() | stream(), string()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec query(connection() | stream(), string()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 query(Stream = #tdm_stream{}, Query) ->
     tdm_stream:query(Stream, Query, #tdm_query_params{}, ?DEFAULT_TIMEOUT);
 query(Connection, Query) ->
@@ -255,7 +255,7 @@ query_async(Connection, Query, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection() | stream(), string(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec query(connection() | stream(), string(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 query(Stream = #tdm_stream{}, Query, Timeout) ->
     tdm_stream:query(Stream, Query, #tdm_query_params{}, Timeout);
 query(Connection, Query, Timeout) ->
@@ -271,7 +271,7 @@ query(Connection, Query, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection()| stream(), string(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec query(connection()| stream(), string(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 query(Stream = #tdm_stream{}, Query, Params, Timeout) ->
     tdm_stream:query(Stream, Query, Params, Timeout);
 query(Connection, Query, Params, Timeout) ->
@@ -303,7 +303,7 @@ query_async(Connection, Query, Params, ReplyTo) ->
 %%% UseCache - use cached preparestatements
 %%% Result - result of query or error or timeout.
 %%% @end
--spec query(connection() | stream(), string(), query_params(), timeout(), boolean()) -> timeout | ok | error() | result_rows() | schema_change().
+-spec query(connection() | stream(), string(), query_params(), timeout(), boolean()) -> timeout | ok | error() | result_rows() | schema_change() | keyspace().
 query(Stream = #tdm_stream{}, Query, Params, Timeout, UseCache) ->
     tdm_stream:query(Stream, Query, Params, Timeout, UseCache);
 query(Connection, Query, Params, Timeout, UseCache) ->
@@ -406,7 +406,7 @@ prepare_query_async(Connection, Query, ReplyTo, UseCache) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 execute_query(Stream = #tdm_stream{}, ID) ->
     tdm_stream:execute_query(Stream, ID, #tdm_query_params{}, ?DEFAULT_TIMEOUT);
 execute_query(Connection, ID) ->
@@ -434,7 +434,7 @@ execute_query_async(Connection, ID, ReplyTo) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 execute_query(Stream = #tdm_stream{}, ID, Timeout) ->
     tdm_stream:execute_query(Stream, ID, #tdm_query_params{}, Timeout);
 execute_query(Connection, ID, Timeout) ->
@@ -449,7 +449,7 @@ execute_query(Connection, ID, Timeout) ->
 %%% Timeout - the number of milliseconds before operation times out.
 %%% Result - result of query or error or timeout.
 %%% @end
--spec execute_query(connection() | stream(), binary(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change().
+-spec execute_query(connection() | stream(), binary(), query_params(), timeout()) -> {error, timeout} | ok | error() | result_rows() | schema_change() | keyspace().
 execute_query(Stream = #tdm_stream{}, ID, Params, Timeout) ->
     tdm_stream:execute_query(Stream, ID, Params, Timeout);
 execute_query(Connection, ID, Params, Timeout) ->

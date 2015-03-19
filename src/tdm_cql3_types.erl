@@ -30,13 +30,9 @@ erase_type({_Type, Value}) ->
 decode(Type, Value) ->
     decode(Type, Value, int).
 
--spec get_length(Data :: binary(), IntSize :: short | int) -> {non_neg_integer(), binary()}.
-get_length(Data, IntSize) ->
-    S = case IntSize of
-            short -> 16;
-            int -> 32
-        end,
-    <<Length:S/signed, Rest/binary>> = Data,
+-spec get_length(Data :: binary(), IntSize :: int) -> {non_neg_integer(), binary()}.
+get_length(Data, int) ->
+    <<Length:32/signed, Rest/binary>> = Data,
     {Length, Rest}.
 
 -spec decode(teledamus:cql_type(), binary(), int | short) -> {any(), binary()}.
@@ -238,8 +234,6 @@ decode_int(X) when is_binary(X) ->
 
 -type int_type() :: short | int | long | bigint.
 -spec encode_int(integer(), int_type()) -> binary().
-%% encode_int(V, bytes) -> <<V:1/big-signed-integer-unit:8>>;
-encode_int(V, short) -> <<V:2/big-signed-integer-unit:8>>;
 encode_int(V, int) -> <<V:4/big-signed-integer-unit:8>>;
 encode_int(V, long) -> <<V:8/big-signed-integer-unit:8>>;
 encode_int(V, bigint) ->
@@ -249,7 +243,6 @@ encode_int(V, bigint) ->
 
 -spec encode_uint(non_neg_integer(), int_type()) -> binary().
 %% encode_uint(V, byte) -> <<V:8/big-unsigned-integer>>;
-encode_uint(V, short) -> <<V:16/big-unsigned-integer>>;
 encode_uint(V, int) -> <<V:32/big-unsigned-integer>>.
 %% encode_uint(V, long) -> <<V:64/big-unsigned-integer>>;
 %% encode_uint(V, bigint) -> binary:encode_unsigned(V).

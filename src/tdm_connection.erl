@@ -192,8 +192,7 @@ init([Host, Port, Opts, Credentials, Transport, Compression, ChannelMonitor, Min
                 {ok, #state{
                     socket = Socket,
                     transport = Transport,
-                    compression =
-                    Compression,
+                    compression = Compression,
                     streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()),
                     monitor_ref = MonitorRef,
                     protocol = protocol_to_module(Protocol),
