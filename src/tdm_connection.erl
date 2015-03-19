@@ -288,7 +288,7 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
             {noreply, State};
 
         {release_stream, #tdm_stream{stream_id = Id}} ->
-            {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
+            {noreply, State#state{streams = dict:erase(Id, Streams)}};
 
         _ ->
             error_logger:error_msg("Unknown request ~p~n", [Request]),
