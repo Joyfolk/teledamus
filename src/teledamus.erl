@@ -29,7 +29,7 @@
 -type prepared_query_id() :: binary().
 -type batch_query_item() :: {query_text() | prepared_query_id(), bind_variables()}.
 -type batch_query() :: #tdm_batch_query{}.
--type cql_result() :: timeout | ok | error() | result_rows() | schema_change().
+-type cql_result() :: timeout | ok | error() | result_rows() | schema_change() | keyspace().
 -type protocol_version() :: cql1 | cql2 | cql3.
 -type protocol_module() :: tdm_cql1 | tdm_cql2 | tdm_cql3.
 
@@ -53,7 +53,7 @@
 -type rows() :: [list()].
 -type socket() :: gen_tcp:socket() | ssl:sslsocket().
 -type transport() :: tcp | ssl.
--type result_rows() :: {metadata(), paging_state(), rows()}.
+-type result_rows() :: {metadata(), paging_state() | undefined, rows()}.
 -export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, result_rows/0, stream/0, compression/0, socket/0, transport/0, stream_id/0]).
 
 
