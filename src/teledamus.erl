@@ -53,7 +53,7 @@
 -type rows() :: [list()].
 -type socket() :: gen_tcp:socket() | ssl:sslsocket().
 -type transport() :: tcp | ssl.
--type result_rows() :: {metadata(), paging_state() | undefined, rows()}.
+-type result_rows() :: {colspec(), paging_state() | undefined, rows()}.
 -export_type([connection/0, error/0, options/0, keyspace/0, schema_change/0, paging_state/0, metadata/0, rows/0, result_rows/0, stream/0, compression/0, socket/0, transport/0, stream_id/0]).
 
 
