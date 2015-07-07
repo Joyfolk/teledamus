@@ -24,7 +24,7 @@
 
 
 -record(state, {transport = gen_tcp :: teledamus:transport(), socket :: teledamus:socket(), buffer = <<>>:: binary(), caller :: pid(), compression = none :: teledamus:compression(),
-    streams :: dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference(), protocol = tdm_cql3 :: teledamus:protocol_module()}).
+    streams :: dict:dict(), host :: list(), port :: pos_integer(), monitor_ref :: reference(), protocol = tdm_cql3 :: teledamus:protocol_module()}).
 
 
 %%%===================================================================
