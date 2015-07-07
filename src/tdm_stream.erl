@@ -41,7 +41,7 @@ options(Stream, Timeout) ->
 options_async(Stream, ReplyTo) ->
     cast(Stream, options, ReplyTo).
 
--spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change() | teledamus:keyspace().
 query(Stream, Query, Params, Timeout) ->
     call(Stream, {query, Query, Params}, Timeout).
 
@@ -49,7 +49,7 @@ query(Stream, Query, Params, Timeout) ->
 query_async(Stream, Query, Params, ReplyTo) ->
     cast(Stream, {query, Query, Params}, ReplyTo).
 
--spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Stream :: teledamus:stream(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change()| teledamus:keyspace().
 query(Stream = #tdm_stream{connection = Con}, Query, Params, Timeout, UseCache) ->
     case UseCache of
         true ->
@@ -107,7 +107,7 @@ prepare_query_async(Stream, Query, ReplyTo, UseCache) ->
         end
     end).
 
--spec execute_query(Stream :: teledamus:stream(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec execute_query(Stream :: teledamus:stream(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change() | teledamus:keyspace().
 execute_query(Stream, ID, Params, Timeout) ->
     call(Stream, {execute, ID, Params}, Timeout).
 
@@ -238,7 +238,7 @@ reply_if_needed(Caller, Reply, ChannelMonitor) ->
     end.
 
 
-handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection{pid = Connection}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor, protocol = Protocol}) ->
+handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection{pid = Connection, host = Host, port = Port}, compression = Compression, id = StreamId, channel_monitor = ChannelMonitor, protocol = Protocol}) ->
     case Request of
         {call, From, Msg} ->
             case ChannelMonitor of
@@ -297,6 +297,12 @@ handle_msg(Request, State = #state{caller = Caller, connection = #tdm_connection
                 ?OPC_ERROR ->
                     Error = Protocol:parse_error(Frame),
                     error_logger:error_msg("CQL error ~p~n", [Error]),
+                    case Error of
+                        #tdm_error{type = unprepared_query} ->
+                            %% todo: check if invalid query id exists in cache + invalidate single query, not all?
+                            tdm_stmt_cache:invalidate(Host, Port);
+                        _ -> ok
+                    end,
                     reply_if_needed(Caller, {error, Error}, ChannelMonitor),
                     {noreply, State#state{caller = undefined}};
                 ?OPC_READY ->
@@ -344,7 +350,7 @@ call(#tdm_stream{stream_pid = Pid}, Msg, Timeout) ->
                     erlang:demonitor(Mref, [flush]),
                     X;
                 {'DOWN', Mref, _Type, _Object, normal} ->
-                    ok;
+                    {error, {process_stopped, Pid}};
                 {'DOWN', Mref, _Type, _Object, Info} ->
                     {error, Info}
             after

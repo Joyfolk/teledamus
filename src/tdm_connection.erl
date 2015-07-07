@@ -57,7 +57,7 @@ options(#tdm_connection{default_stream = Stream}, Timeout) ->
 options_async(#tdm_connection{default_stream = Stream}, Timeout) ->
     tdm_stream:options_async(Stream, Timeout).
 
--spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change() | teledamus:keyspace().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout) ->
     tdm_stream:query(Stream, Query, Params, Timeout).
 
@@ -65,7 +65,7 @@ query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout) ->
 query_async(#tdm_connection{default_stream = Stream}, Query, Params, ReplyTo) ->
     tdm_stream:query_async(Stream, Query, Params, ReplyTo).
 
--spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec query(Con :: teledamus:connection(), Query :: teledamus:query_text(), Params :: teledamus:query_params(), Timeout :: timeout(), UseCache :: boolean()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change() | teledamus:keyspace().
 query(#tdm_connection{default_stream = Stream}, Query, Params, Timeout, UseCache) ->
     tdm_stream:query(Stream, Query, Params, Timeout, UseCache).
 
@@ -89,7 +89,7 @@ prepare_query(#tdm_connection{default_stream = Stream}, Query, Timeout, UseCache
 prepare_query_async(#tdm_connection{default_stream = Stream}, Query, ReplyTo, UseCache) ->
     tdm_stream:prepare_query_async(Stream, Query, ReplyTo, UseCache).
 
--spec execute_query(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change().
+-spec execute_query(Con :: teledamus:connection(), ID :: teledamus:prepared_query_id(), Params :: teledamus:query_params(), Timeout :: timeout()) -> {error, timeout} | ok | teledamus:error() | teledamus:result_rows() | teledamus:schema_change() | teledamus:keyspace().
 execute_query(#tdm_connection{default_stream = Stream}, ID, Params, Timeout) ->
     tdm_stream:execute_query(Stream, ID, Params, Timeout).
 
@@ -192,8 +192,7 @@ init([Host, Port, Opts, Credentials, Transport, Compression, ChannelMonitor, Min
                 {ok, #state{
                     socket = Socket,
                     transport = Transport,
-                    compression =
-                    Compression,
+                    compression = Compression,
                     streams = dict:store(?DEFAULT_STREAM_ID, DefStream2, dict:new()),
                     monitor_ref = MonitorRef,
                     protocol = protocol_to_module(Protocol),
@@ -288,7 +287,7 @@ handle_cast(Request, State = #state{transport = Transport, socket = Socket, stre
             {noreply, State};
 
         {release_stream, #tdm_stream{stream_id = Id}} ->
-            {reply, ok, State#state{streams = dict:erase(Id, Streams)}};
+            {noreply, State#state{streams = dict:erase(Id, Streams)}};
 
         _ ->
             error_logger:error_msg("Unknown request ~p~n", [Request]),
