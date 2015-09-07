@@ -142,7 +142,12 @@ handle_call(Request, From, State) ->
             #tdm_connection{pid = Pid} = Connection,
             case is_process_alive(Pid) of
                 true ->
-                    tdm_connection:close(Connection, 5000),
+                    try
+                        tdm_connection:close(Connection, 5000)
+                    catch
+                        E: EE ->
+                            error_logger:error_msg("Failed to close connection: ~p: ~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()])
+                    end,
                     {reply, ok, State};
                 false ->
                     {reply, {error, connection_is_not_alive}, State}
