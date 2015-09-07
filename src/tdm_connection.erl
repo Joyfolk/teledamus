@@ -482,19 +482,23 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
                 CasOpts = startup_opts(Compression, Protocol),
                 case send(Socket, Transport, Compression, #tdm_frame{header = Protocol:startup_header(), body = Protocol:encode_string_map(CasOpts)}, Protocol) of
                     ok ->
-                        {Frame, _R} = read_frame(Socket, Transport, Compression, Protocol),
-                        case (Frame#tdm_frame.header)#tdm_header.opcode of
-                            ?OPC_ERROR ->
-                                Error = Protocol:parse_error(Frame),
-                                error_logger:error_msg("CQL error ~p~n", [Error]),
-                                {error, Error};
-                            ?OPC_AUTHENTICATE ->
-                                {Authenticator, _Rest} = Protocol:parse_string(Frame#tdm_frame.body),
-                                authenticate(Socket, Authenticator, Credentials, Transport, Compression, Protocol);
-                            ?OPC_READY ->
-                                {ok, Socket, module_to_protocol(Protocol)};
-                            OpCode ->
-                                {error, {unknown_response_code, OpCode}}
+                        case read_frame(Socket, Transport, Compression, Protocol) of
+                            Err = {error, _} ->
+                                Err;
+                            {Frame, _R} ->
+                                case (Frame#tdm_frame.header)#tdm_header.opcode of
+                                    ?OPC_ERROR ->
+                                        Error = Protocol:parse_error(Frame),
+                                        error_logger:error_msg("CQL error ~p~n", [Error]),
+                                        {error, Error};
+                                    ?OPC_AUTHENTICATE ->
+                                        {Authenticator, _Rest} = Protocol:parse_string(Frame#tdm_frame.body),
+                                        authenticate(Socket, Authenticator, Credentials, Transport, Compression, Protocol);
+                                    ?OPC_READY ->
+                                        {ok, Socket, module_to_protocol(Protocol)};
+                                    OpCode ->
+                                        {error, {unknown_response_code, OpCode}}
+                                end
                         end;
                     Error ->
                         {error, Error}
@@ -519,19 +523,23 @@ startup_int(Host, Port, Opts, Credentials, Transport, Compression, Protocol) ->
 
 read_frame(Socket, Transport, Compression, Protocol) ->
     HeaderLen = Protocol:header_length(),
-    {ok, Data} = Transport:recv(Socket, HeaderLen + 4, ?RECV_TIMEOUT), %% header + frame length (32b)
-    <<_Header:HeaderLen/binary, Length:32/big-unsigned-integer>> = Data,
-    Body = if
-        Length =/= 0 ->
-            case Transport:recv(Socket, Length, ?RECV_TIMEOUT) of
-                {ok, X} -> X;
-                {error, X} -> throw(X)
-            end;
-        true ->
-            <<>>
-    end,
-    F = <<Data/binary,Body/binary>>,
-    Protocol:parse_frame(F, Compression).
+    case Transport:recv(Socket, HeaderLen + 4, ?RECV_TIMEOUT) of %% header + frame length (32b)
+        {ok, Data} ->
+            <<_Header:HeaderLen/binary, Length:32/big-unsigned-integer>> = Data,
+            Body = if
+                       Length =/= 0 ->
+                           case Transport:recv(Socket, Length, ?RECV_TIMEOUT) of
+                               {ok, X} -> X;
+                               {error, X} -> throw(X)
+                           end;
+                       true ->
+                           <<>>
+                   end,
+            F = <<Data/binary,Body/binary>>,
+            Protocol:parse_frame(F, Compression);
+        Err = {error, _} ->
+            Err
+    end.
 
 
 encode_plain_credentials(User, Password, Protocol) when is_list(User) ->
@@ -547,19 +555,23 @@ authenticate(Socket, Authenticator, Credentials, Transport, Compression, Protoco
     {User, Password} = Credentials,
     case send(Socket, Transport, Compression, #tdm_frame{header = #tdm_header{opcode = ?OPC_AUTH_RESPONSE, type = request}, body = encode_plain_credentials(User, Password, Protocol)}, Protocol) of
         ok ->
-            {Frame, _R} = read_frame(Socket, Transport, Compression, Protocol),
-            case (Frame#tdm_frame.header)#tdm_header.opcode of
-                ?OPC_ERROR ->
-                    Error = Protocol:parse_error(Frame),
-                    error_logger:error_msg("Authentication error [~p]: ~p~n", [Authenticator, Error]),
-                    {error, Error};
-                ?OPC_AUTH_CHALLENGE ->
-                    error_logger:error_msg("Unsupported authentication message~n"),
-                    {error, authentification_error};
-                ?OPC_AUTH_SUCCESS ->
-                    ok;
-                _ ->
-                    {error, unknown_response_code}
+            case read_frame(Socket, Transport, Compression, Protocol) of
+                Err = {error, _} ->
+                    Err;
+                {Frame, _R} ->
+                    case (Frame#tdm_frame.header)#tdm_header.opcode of
+                        ?OPC_ERROR ->
+                            Error = Protocol:parse_error(Frame),
+                            error_logger:error_msg("Authentication error [~p]: ~p~n", [Authenticator, Error]),
+                            {error, Error};
+                        ?OPC_AUTH_CHALLENGE ->
+                            error_logger:error_msg("Unsupported authentication message~n"),
+                            {error, authentification_error};
+                        ?OPC_AUTH_SUCCESS ->
+                            ok;
+                        _ ->
+                            {error, unknown_response_code}
+                    end
             end;
         Error ->
             {error, Error}
