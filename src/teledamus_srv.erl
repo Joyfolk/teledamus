@@ -142,13 +142,17 @@ handle_call(Request, From, State) ->
             #tdm_connection{pid = Pid} = Connection,
             case is_process_alive(Pid) of
                 true ->
-                    try
-                        tdm_connection:close(Connection, 5000)
-                    catch
-                        E: EE ->
-                            error_logger:error_msg("Failed to close connection: ~p: ~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()])
-                    end,
-                    {reply, ok, State};
+                    spawn(fun() ->
+                        try
+                            tdm_connection:close(Connection, 5000),
+                            gen_server:reply(From, ok)
+                        catch
+                            E: EE ->
+                                error_logger:error_msg("Failed to close connection: ~p: ~p, stacktrace=~p", [E, EE, erlang:get_stacktrace()]),
+                                gen_server:reply(From, {error, {E, EE}})
+                        end
+                    end),
+                    {noreply, State};
                 false ->
                     {reply, {error, connection_is_not_alive}, State}
             end
